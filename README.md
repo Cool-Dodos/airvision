@@ -1,145 +1,111 @@
-# AirVision Global — Real-time AQI Monitor
-### MERN Stack — v1.1.0
+# 🌍 AirVision Global
+### **Advanced Real-time AQI Monitoring & Visualization**
+**Stack:** MEAN (MongoDB, Express, Angular, Node.js) | **Version:** 1.2.0
 
-Interactive 3D globe monitoring real-time air quality across 100+ countries.
-India map uses the official Survey of India boundary (includes J&K, PoK, Aksai Chin).
+AirVision is a high-performance 3D visualization platform that monitors real-time air quality (AQI) across the globe. Built with D3.js and Angular, it provides a seamless, data-rich experience for tracking environmental health at both global and regional scales.
 
----
-
-## What's in v1.1
-
-### Globe
-- Countries colored by live AQI (6-tier scale)
-- **Scroll to zoom in** — country names appear automatically at 1.6× zoom
-- **Hover** shows: country name, AQI value, category, safe outdoor time, pollution source
-- **Click** centers globe on that country + opens full health dashboard
-- Drag to rotate · auto-rotation resumes after 8s
-
-### Smart Health Dashboard (click any country)
-- Safe outdoor duration for healthy / sensitive / children+elderly
-- Best hour of day to go outside (accounts for pollutant type)
-- Mask type recommendation
-- 12h sparkline + 6h forecast (linear regression)
-- Per-pollutant readings with dominant pollutant highlighted
-- Dominant pollutant: source + specific health effect card
-- 30-day baseline comparison (above/below normal indicator)
-
-### Anomaly Feed (center top button)
-- Detects countries with AQI 80%+ above their 30-day rolling average
-- Severity tiers: Elevated / Severe / Extreme
-- Click any anomaly → globe zooms to that country
-- Blinks red when extreme events are active
-
-### Trend & Prediction
-- Linear regression on last 8 readings (15-min intervals)
-- Direction arrow: ↑↑ Rising fast / ↑ Rising / → Stable / ↓ Improving / ↓↓ Improving fast
-- 1h / 3h / 6h AQI forecasts shown in panel
+![Global View](file:///C:/Users/dell/.gemini/antigravity/brain/31d2f107-111c-47ba-bb78-79b9e2a6fff2/brazil_australia_verified_1773572613469.png)
 
 ---
 
-## Tech Stack
-- **MongoDB** — AQI snapshots + 30-day daily averages
-- **Express.js** — REST API
-- **React + D3.js** — 3D globe, health dashboard
-- **Node.js** — cron-based auto-refresh every 15 min
+## 🔥 Key Features
 
-## Data Source
-**WAQI** — https://aqicn.org/data-platform/token (free token, no credit card)
+### 🇮🇳 India State-Level Mapping (New!)
+- **High-Resolution Borders**: Integrated ADM1 state borders for precise visualization.
+- **177+ Cities Mapped**: Comprehensive coverage across all 36 States and Union Territories.
+- **Intelligent Fallbacks**: Real-time aggregation of multiple city stations per state with coordinate-based proximity fallbacks.
+- **Visual Accuracy**: Correctly renders all territories including Jammu & Kashmir, Ladakh, and island territories.
+
+### 🌎 Dynamic 3D Globe
+- **6-Tier AQI Coloring**: Countries and states are dynamically colored based on real-time pollution levels.
+- **Intelligent Zoom**: Labels and state borders transition seamlessly as you zoom in (optimized at 2.8x threshold).
+- **Hover Dashboards**: Instant tooltips showing AQI value, category, and safe outdoor activity duration.
+- **Two-Tier Geometry**: Uses 50m global resolution with lazy-loaded high-res ADM1 boundaries for focused regions.
+
+### ⚡ Performance Optimized
+- **30 FPS Throttling**: The rendering engine is capped to ensure smooth rotation and interaction even on mid-range hardware.
+- **Angular Zone Optimization**: Event listeners are decoupled from change detection cycles to reduce CPU overhead during heavy interaction.
 
 ---
 
-## Project Structure
-```
-airvision/
-├── server/
-│   ├── index.js
-│   ├── models/
-│   │   ├── AqiSnapshot.js      All-country snapshot (48 kept = 12h)
-│   │   ├── DailyAverage.js     Per-country daily avg (30 days kept)
-│   │   └── CountryDetail.js
-│   ├── routes/
-│   │   └── aqi.js              5 API endpoints
-│   └── services/
-│       ├── waqi.js             100-country city list + fetch helpers
-│       ├── cron.js             15-min refresh + anomaly cache
-│       └── analytics.js        Linear regression + anomaly detection
-└── client/
-    └── src/
-        ├── App.jsx
-        ├── components/
-        │   ├── Globe.jsx        D3 globe + zoom labels + hover tooltip
-        │   ├── InfoPanel.jsx    Full health dashboard
-        │   └── AnomalyFeed.jsx  Anomaly event feed
-        ├── data/
-        │   └── india-official.json
-        └── utils/
-            ├── aqi.js           AQI colors + country code maps
-            └── health.js        Safe time / mask / pollutant effects
+## 🛠️ Technology Stack
+
+- **Frontend**: Angular 17, D3.js, TopoJSON
+- **Backend**: Node.js, Express, Axios
+- **Database**: MongoDB (Mongoose)
+- **Data Source**: World Air Quality Index (WAQI) API
+
+---
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+- Node.js (v18+)
+- MongoDB running locally or a remote URI
+- A free WAQI API Token ([Get it here](https://aqicn.org/data-platform/token/))
+
+### 2. Installation
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/airvision.git
+cd airvision
+
+# Install backend dependencies
+cd server
+npm install
+
+# Install frontend dependencies
+cd ../client-ng
+npm install
 ```
 
----
+### 3. Environment Setup
+Create a `.env` file in the `server` directory:
+```env
+PORT=5000
+MONGO_URI=mongodb://localhost:27017/airvision
+WAQI_TOKEN=your_token_here
+```
 
-## Setup
-
-### 1. Get WAQI token
-Go to https://aqicn.org/data-platform/token — register with email, token arrives instantly.
-
-### 2. Configure environment
+### 4. Running the Application
+**Backend:**
 ```bash
 cd server
-cp .env.example .env
-# Fill in:
-# WAQI_TOKEN=your_token_here
-# MONGO_URI=mongodb://localhost:27017/airvision
+node index.js
 ```
 
-### 3. Install and run
+**Frontend:**
 ```bash
-# From root airvision/ folder:
-npm run install:all
-
-# Terminal 1:
-npm run dev:server    # Express on :5000
-
-# Terminal 2:
-npm run dev:client    # React/Vite on :5173
+cd client-ng
+npx ng serve --port 4200
 ```
-
-Open http://localhost:5173
-
-On first boot the cron job fires immediately — globe populates in ~30s.
-Anomaly detection improves after 3+ days of data accumulation.
+Visit `http://localhost:4200` to see the globe in action.
 
 ---
 
-## API Endpoints
-
-| Method | Route | Description |
-|--------|-------|-------------|
-| GET | `/api/aqi/world` | All-country latest snapshot |
-| GET | `/api/aqi/country/:code` | Detail + trend + 6h prediction |
-| GET | `/api/aqi/history/:code` | Last 12h readings (sparkline) |
-| GET | `/api/aqi/anomalies` | Countries with AQI 80%+ above baseline |
-| GET | `/api/aqi/stations` | Raw station lat/lng dots |
-| GET | `/api/health` | Server health check |
+## 📊 Deployment
+The application is ready for partitioned deployment:
+- **Frontend**: Optimized for Vercel / Netlify.
+- **Backend**: Optimized for Render / Heroku (includes built-in CORS configurations).
 
 ---
 
-## AQI Scale
+## 🛣️ Roadmap
+- [x] High-res India State Mapping
+- [x] Global Persistence Layer (merging snapshots)
+- [ ] Atmospheric Wind Overlay
+- [ ] Historical Comparison Mode (Daily/Weekly trends)
+- [ ] Mobile-responsive layout refinement
 
-| AQI | Category | Color |
-|-----|----------|-------|
-| 0–50 | Good | Green |
-| 51–100 | Moderate | Yellow |
-| 101–150 | Unhealthy for Sensitive Groups | Orange |
-| 151–200 | Unhealthy | Red |
-| 201–300 | Very Unhealthy | Purple |
+---
+
+![India State View](file:///C:/Users/dell/.gemini/antigravity/brain/31d2f107-111c-47ba-bb78-79b9e2a6fff2/initial_globe_view_1773577302349.png)
+201–300 | Very Unhealthy | Purple |
 | 301+ | Hazardous | Dark Red |
 
 ---
 
 ## v1.5 Roadmap (coming next)
-- Rain overlay (Open-Meteo, free)
 - Wind direction arrows
 - Temperature globe mode toggle
 - WebSocket live push (Socket.io)
