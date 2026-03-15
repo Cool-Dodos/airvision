@@ -1,0 +1,56 @@
+.af-btn {
+  position: fixed; top: 22px; left: 50%; transform: translateX(-50%);
+  background: rgba(2,5,16,0.88);
+  border: 1px solid #0d2a4a;
+  border-radius: 2px; padding: 7px 18px; cursor: pointer;
+  font-family: 'Courier New', monospace;
+  font-size: 10px; letter-spacing: 0.25em; color: #2a5a8a;
+  text-transform: uppercase; z-index: 25;
+  display: flex; align-items: center; gap: 8px;
+}
+.af-btn.critical { border-color: #ff0000; color: #ff0000; }
+.blink-dot {
+  width: 7px; height: 7px; background: #ff0000; border-radius: 50%;
+  display: inline-block; animation: blink 1.2s infinite;
+}
+.badge {
+  background: #0d2a4a; color: #fff;
+  border-radius: 2px; padding: 1px 6px; font-size: 10px;
+}
+.badge.critical-badge { background: #ff0000; }
+
+.feed-panel {
+  position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+  width: 360px; max-height: 420px; overflow-y: auto;
+  background: rgba(2,5,16,0.96); border: 1px solid #0d2a4a;
+  border-radius: 2px; z-index: 24;
+  font-family: 'Courier New', monospace;
+  scrollbar-width: none;
+}
+.feed-header {
+  padding: 12px 16px; border-bottom: 1px solid #0d2a4a;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.feed-title { font-size: 9px; letter-spacing: 0.35em; color: #2a4a6a; text-transform: uppercase; }
+.feed-sub   { font-size: 9px; color: #1a3a5a; letter-spacing: 0.1em; }
+.feed-msg   { padding: 16px; font-size: 11px; color: #2a4a6a; letter-spacing: 0.2em; text-align: center; }
+.feed-empty { color: #1a3a5a; }
+
+.feed-item {
+  padding: 12px 16px; border-bottom: 1px solid #060e1e;
+  cursor: pointer; transition: background 0.2s;
+}
+.item-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 5px; }
+.item-name { font-size: 12px; color: #c8d8f0; font-weight: bold; letter-spacing: 0.06em; }
+.item-src  { font-size: 10px; color: #3a5a7a; margin-left: 8px; }
+.item-badge {
+  font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase;
+  border: 1px solid; border-radius: 1px; padding: 2px 5px;
+}
+.item-aqi-row { display: flex; gap: 16px; align-items: baseline; }
+.item-aqi  { font-size: 22px; font-weight: bold; line-height: 1; }
+.item-meta { font-size: 10px; color: #3a5a7a; }
+.item-base { color: #5a7a9a; }
+.item-cat  { font-size: 9px; color: #1a3a5a; margin-top: 4px; letter-spacing: 0.1em; }
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }

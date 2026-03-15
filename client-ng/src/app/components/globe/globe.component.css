@@ -1,0 +1,20 @@
+.tooltip {
+  position: fixed;
+  background: rgba(2,5,16,0.95);
+  border: 1px solid #0d2a4a;
+  border-radius: 2px;
+  padding: 10px 14px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 30;
+  font-family: 'Courier New', monospace;
+  min-width: 160px;
+}
+.tt-name  { color: #c8d8f0; font-weight: bold; margin-bottom: 4px; letter-spacing: 0.06em; }
+.tt-aqi-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+.tt-aqi  { font-size: 22px; font-weight: bold; line-height: 1; }
+.tt-cat  { font-size: 9px; letter-spacing: 0.15em; }
+.tt-safe { font-size: 10px; color: #3a5a7a; }
+.tt-safe span { color: #5a7a9a; }
+.tt-src  { font-size: 10px; color: #3a5a7a; margin-top: 3px; }
+.tt-hint { font-size: 9px; color: #1a3a5a; margin-top: 6px; letter-spacing: 0.1em; }

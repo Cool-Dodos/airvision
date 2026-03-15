@@ -1,0 +1,13 @@
+{
+  "name": "airvision",
+  "version": "1.1.0",
+  "description": "AirVision Global AQI Monitor - MEAN Stack",
+  "scripts": {
+    "install:all": "cd server && npm install && cd ../client-ng && npm install",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client-ng && npm start",
+    "dev": "npm run dev:server & npm run dev:client",
+    "build": "cd client-ng && npm run build",
+    "start": "cd server && npm start"
+  }
+}

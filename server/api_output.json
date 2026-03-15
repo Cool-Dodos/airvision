@@ -1,0 +1,150 @@
+{
+    "ok":  true,
+    "count":  36,
+    "states":  {
+                   "Uttar Pradesh":  {
+                                         "aqi":  155,
+                                         "city":  "Central School, Lucknow, India"
+                                     },
+                   "Bihar":  {
+                                 "aqi":  108,
+                                 "city":  "New DM Office, Arrah, India"
+                             },
+                   "Chhattisgarh":  {
+                                        "aqi":  58,
+                                        "city":  "Doon University, Dehradun, India"
+                                    },
+                   "Punjab":  {
+                                  "aqi":  75,
+                                  "city":  "Golden Temple, Amritsar, India"
+                              },
+                   "Dadra and Nagar Haveli and Daman and Diu":  {
+                                                                    "aqi":  63,
+                                                                    "city":  "Phase-1 GIDC, Vapi, India"
+                                                                },
+                   "Ladakh":  {
+                                  "aqi":  30,
+                                  "city":  "Rue  Lafaurie (coté Montant), Le Havre, France"
+                              },
+                   "Mizoram":  {
+                                   "aqi":  153,
+                                   "city":  "Sikulpuikawn, Aizawl, India"
+                               },
+                   "Lakshadweep":  {
+                                       "aqi":  46,
+                                       "city":  "Kera, Kochi, Kochi Prefecture, Japan (?????)"
+                                   },
+                   "Andaman and Nicobar":  {
+                                               "aqi":  65,
+                                               "city":  "Municipal Health Center 1, Phuket, Thailand (???????????????????? 1 ??????????? ???????????????)"
+                                           },
+                   "Gujarat":  {
+                                   "aqi":  90,
+                                   "city":  "Maninagar, Ahmedabad, India"
+                               },
+                   "Haryana":  {
+                                   "aqi":  159,
+                                   "city":  "Patti Mehar, Ambala, India"
+                               },
+                   "Maharashtra":  {
+                                       "aqi":  102,
+                                       "city":  "Kurla, Mumbai, India"
+                                   },
+                   "Rajasthan":  {
+                                     "aqi":  94,
+                                     "city":  "Police Commissionerate, Jaipur, India"
+                                 },
+                   "Nagaland":  {
+                                    "aqi":  42,
+                                    "city":  "PWD Juction, Kohima, India"
+                                },
+                   "Assam":  {
+                                 "aqi":  92,
+                                 "city":  "Railway Colony, Guwahati, India"
+                             },
+                   "Uttaranchal":  {
+                                       "aqi":  58,
+                                       "city":  "Doon University, Dehradun, India"
+                                   },
+                   "Orissa":  {
+                                  "aqi":  74,
+                                  "city":  "Talcher Coalfields, Talcher, India"
+                              },
+                   "Chandigarh":  {
+                                      "aqi":  54,
+                                      "city":  "Sector 22, Chandigarh, India"
+                                  },
+                   "Jammu and Kashmir":  {
+                                             "aqi":  48,
+                                             "city":  "Rajbagh, Srinagar, India"
+                                         },
+                   "Tripura":  {
+                                   "aqi":  145,
+                                   "city":  "Bardowali, Agartala, India"
+                               },
+                   "Arunachal Pradesh":  {
+                                             "aqi":  13,
+                                             "city":  "Naharlagun, Naharlagun, India"
+                                         },
+                   "Meghalaya":  {
+                                     "aqi":  9,
+                                     "city":  "JN Stadium, Shillong, India"
+                                 },
+                   "Kerala":  {
+                                  "aqi":  46,
+                                  "city":  "Kera, Kochi, Kochi Prefecture, Japan (?????)"
+                              },
+                   "Telangana":  {
+                                     "aqi":  109,
+                                     "city":  "Somajiguda, Hyderabad, India"
+                                 },
+                   "Puducherry":  {
+                                      "aqi":  15,
+                                      "city":  "Jawahar Nagar, Puducherry, India"
+                                  },
+                   "West Bengal":  {
+                                       "aqi":  85,
+                                       "city":  "Ballygunge, Kolkata, India"
+                                   },
+                   "Delhi":  {
+                                 "aqi":  75,
+                                 "city":  "Major Dhyan Chand National Stadium, Delhi, Delhi, India"
+                             },
+                   "Tamil Nadu":  {
+                                      "aqi":  60,
+                                      "city":  "Royapuram, Chennai, Chennai, India"
+                                  },
+                   "Himachal Pradesh":  {
+                                            "aqi":  123,
+                                            "city":  "HIMUDA Complex Phase-1, Baddi, India"
+                                        },
+                   "Jharkhand":  {
+                                     "aqi":  101,
+                                     "city":  "SFTI Kusdihra, Gaya, India"
+                                 },
+                   "Andhra Pradesh":  {
+                                          "aqi":  48,
+                                          "city":  "Secretariat, Amaravati, India"
+                                      },
+                   "Karnataka":  {
+                                     "aqi":  153,
+                                     "city":  "Hombegowda Nagar, Bengaluru, India"
+                                 },
+                   "Sikkim":  {
+                                  "aqi":  97,
+                                  "city":  "Zero Point GICI, Gangtok, India"
+                              },
+                   "Madhya Pradesh":  {
+                                          "aqi":  95,
+                                          "city":  "T T Nagar, Bhopal, India"
+                                      },
+                   "Goa":  {
+                               "aqi":  125,
+                               "city":  "Vidayagiri, Bagalkot, India"
+                           },
+                   "Manipur":  {
+                                   "aqi":  42,
+                                   "city":  "PWD Juction, Kohima, India"
+                               }
+               }
+}

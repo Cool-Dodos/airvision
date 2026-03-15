@@ -1,0 +1,15 @@
+<svg #svgEl style="position:fixed;top:0;left:0;width:100%;height:calc(100% - 38px);z-index:1"></svg>
+
+<div *ngIf="tooltip" class="tooltip"
+  [style.left.px]="tooltip.x + 14"
+  [style.top.px]="tooltip.y - 12"
+  [style.border-left]="'2px solid ' + tooltip.col">
+  <div class="tt-name">{{ tooltip.name }}</div>
+  <div class="tt-aqi-row">
+    <span class="tt-aqi" [style.color]="tooltip.col">{{ tooltip.aqi }}</span>
+    <span class="tt-cat" [style.color]="tooltip.col">{{ tooltip.cat }}</span>
+  </div>
+  <div class="tt-safe">Safe outdoors: <span>{{ tooltip.safe }}</span></div>
+  <div *ngIf="tooltip.src" class="tt-src">{{ tooltip.src.icon }} {{ tooltip.src.tag }}</div>
+  <div class="tt-hint">Click to see full details →</div>
+</div>

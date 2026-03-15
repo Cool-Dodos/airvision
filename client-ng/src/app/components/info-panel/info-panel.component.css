@@ -1,0 +1,39 @@
+.panel {
+  position: fixed; right: 24px; top: 50%; transform: translateY(-50%);
+  width: 260px; max-height: 88vh; overflow-y: auto;
+  background: rgba(2,5,16,0.95); border: 1px solid #0d2a4a;
+  border-radius: 2px; padding: 20px 18px; z-index: 20;
+  font-family: 'Courier New', monospace; color: #8ba4c8;
+  scrollbar-width: none;
+}
+.close { position: absolute; top: 10px; right: 12px; cursor: pointer; font-size: 13px; color: #2a4a6a; }
+.sec-label { font-size: 9px; letter-spacing: 0.35em; color: #2a4a6a; text-transform: uppercase; margin-bottom: 10px; }
+.loading   { color: #2a4a6a; font-size: 11px; letter-spacing: 0.2em; }
+.country-name { font-size: 14px; color: #c8d8f0; font-weight: bold; margin-bottom: 2px; letter-spacing: 0.06em; }
+.city      { font-size: 9px; color: #1a3a5a; margin-bottom: 10px; letter-spacing: 0.15em; }
+.aqi-row   { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 4px; }
+.aqi-val   { font-size: 56px; font-weight: bold; line-height: 1; }
+.trend-block { padding-bottom: 8px; }
+.trend-arrow { font-size: 22px; }
+.trend-label { font-size: 9px; letter-spacing: 0.12em; margin-top: 2px; }
+.aqi-cat   { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 4px; }
+.src-tag   { font-size: 10px; color: #3a5a7a; margin-bottom: 14px; }
+.divider   { border: none; border-top: 1px solid #0a1e38; margin: 14px 0; }
+.spark-svg { display: block; margin-bottom: 8px; }
+.forecast-label { font-size: 7px; fill: #1a3a5a; font-family: monospace; }
+.pred-row  { display: flex; gap: 8px; margin-bottom: 14px; }
+.pred-box  { flex: 1; background: #070f22; border-radius: 2px; padding: 6px 0; text-align: center; }
+.pred-lbl  { font-size: 9px; color: #1a3a5a; letter-spacing: 0.12em; }
+.pred-val  { font-size: 16px; font-weight: bold; }
+.row       { display: flex; justify-content: space-between; align-items: flex-start; font-size: 11px; margin-bottom: 8px; color: #3a5a7a; }
+.val       { color: #8ba4c8; letter-spacing: 0.05em; text-align: right; max-width: 130px; }
+.val.small { font-size: 10px; }
+.mask-note { font-size: 10px; color: #ff7e00; margin-bottom: 8px; text-align: right; }
+.concern-card   { background: #070f22; border-radius: 2px; padding: 10px 12px; }
+.concern-label  { font-size: 11px; font-weight: bold; margin-bottom: 4px; }
+.concern-source { font-size: 10px; color: #3a5a7a; margin-bottom: 4px; }
+.concern-effect { font-size: 10px; color: #5a7a9a; line-height: 1.6; }
+.advice    { font-size: 10px; color: #3a5a7a; line-height: 1.7; }
+.baseline  { margin-top: 12px; font-size: 10px; color: #1a3a5a; }
+.above     { color: #ff7e00; }
+.below     { color: #00e400; }

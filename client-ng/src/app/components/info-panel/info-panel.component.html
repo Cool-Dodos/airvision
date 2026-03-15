@@ -1,0 +1,83 @@
+<div *ngIf="countryCode" class="panel" [style.border-left]="'2px solid ' + (info?.col || '#0d2a4a')">
+  <span class="close" (click)="closePanel.emit()">✕</span>
+
+  <div class="sec-label">Selected Region</div>
+  <div *ngIf="loading" class="loading">Loading...</div>
+
+  <ng-container *ngIf="detail && info">
+    <div class="country-name">{{ detail.countryName || detail.name }}</div>
+    <div *ngIf="detail.city" class="city">{{ detail.city }}</div>
+
+    <!-- AQI + trend -->
+    <div class="aqi-row">
+      <div class="aqi-val" [style.color]="info.col">{{ aqiValue }}</div>
+      <div *ngIf="trend" class="trend-block">
+        <div class="trend-arrow" [style.color]="trend.trend.color">{{ trend.trend.arrow }}</div>
+        <div class="trend-label" [style.color]="trend.trend.color">{{ trend.trend.label }}</div>
+      </div>
+    </div>
+    <div class="aqi-cat" [style.color]="info.col">{{ info.cat }}</div>
+    <div *ngIf="srcTag" class="src-tag">{{ srcTag.icon }} {{ srcTag.tag }}</div>
+
+    <!-- Sparkline + forecast -->
+    <ng-container *ngIf="spark.length > 1">
+      <hr class="divider"/>
+      <div class="sec-label">History + 6h Forecast</div>
+      <svg [attr.width]="SW" [attr.height]="SH" class="spark-svg">
+        <polyline [attr.points]="sparkPoints()" fill="none" [attr.stroke]="info.col" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <polyline *ngIf="preds.length > 0" [attr.points]="forecastPoints()" fill="none" [attr.stroke]="info.col" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
+        <line [attr.x1]="SW*0.65" y1="0" [attr.x2]="SW*0.65" [attr.y2]="SH" stroke="#0d2a4a" stroke-width="1" stroke-dasharray="2 2"/>
+        <text [attr.x]="SW*0.67" y="9" class="forecast-label">forecast →</text>
+      </svg>
+
+      <div *ngIf="trend" class="pred-row">
+        <div class="pred-box" *ngFor="let item of [['1h', trend.predictedIn1h], ['3h', trend.predictedIn3h], ['6h', trend.predictedIn6h]]">
+          <div class="pred-lbl">{{ item[0] }}</div>
+          <div class="pred-val" [style.color]="aqiColor(+item[1])">{{ item[1] }}</div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- Health advisory -->
+    <hr class="divider"/>
+    <div class="sec-label">Health Advisory</div>
+    <div class="row"><span>Healthy adults</span><span class="val">{{ safeTime.healthy }}</span></div>
+    <div class="row"><span>Sensitive groups</span><span class="val">{{ safeTime.sensitive }}</span></div>
+    <div class="row"><span>Children / Elderly</span>
+      <span class="val" [style.color]="safeTime.children === 'Stay in' ? '#ff0000' : '#8ba4c8'">{{ safeTime.children }}</span>
+    </div>
+    <div class="row"><span>Best time outside</span><span class="val small">{{ bestHour }}</span></div>
+    <div class="row"><span>Mask</span>
+      <span class="val" [style.color]="mask.needed ? '#ff7e00' : '#00e400'">{{ mask.type }}</span>
+    </div>
+    <div *ngIf="mask.needed" class="mask-note">{{ mask.note }}</div>
+
+    <!-- Pollutants -->
+    <hr class="divider"/>
+    <div class="sec-label">Pollutant Readings</div>
+    <div class="row" *ngFor="let e of pollutantEntries()">
+      <span>{{ e.label }}</span>
+      <span class="val" [style.color]="dom === e.key ? info.col : '#8ba4c8'">{{ formatVal(e.key, e.val) }}</span>
+    </div>
+
+    <!-- Primary concern -->
+    <ng-container *ngIf="polEff">
+      <hr class="divider"/>
+      <div class="sec-label">Primary Concern</div>
+      <div class="concern-card" [style.border-left]="'2px solid ' + polEff.color">
+        <div class="concern-label" [style.color]="polEff.color">{{ polEff.label }}</div>
+        <div class="concern-source">Source: {{ polEff.source }}</div>
+        <div class="concern-effect">{{ polEff.effect }}</div>
+      </div>
+    </ng-container>
+
+    <hr class="divider"/>
+    <div class="advice">{{ info.advice }}</div>
+
+    <div *ngIf="detail.baseline30" class="baseline">
+      30-day avg: <span [style.color]="aqiColor(detail.baseline30)">{{ detail.baseline30 }}</span>
+      <span *ngIf="(aqiValue ?? 0) > detail.baseline30 * 1.5" class="above"> ↑ above normal</span>
+      <span *ngIf="(aqiValue ?? 0) < detail.baseline30 * 0.7" class="below"> ↓ better than usual</span>
+    </div>
+  </ng-container>
+</div>

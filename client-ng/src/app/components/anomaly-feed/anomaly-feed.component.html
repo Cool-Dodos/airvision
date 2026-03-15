@@ -1,0 +1,48 @@
+<!-- Toggle button -->
+<button class="af-btn"
+  [class.critical]="hasCritical"
+  (click)="open = !open">
+  <span *ngIf="hasCritical" class="blink-dot"></span>
+  Anomalies
+  <span *ngIf="count > 0" class="badge" [class.critical-badge]="hasCritical">{{ count }}</span>
+</button>
+
+<!-- Feed panel -->
+<div *ngIf="open" class="feed-panel">
+  <div class="feed-header">
+    <span class="feed-title">Unusual AQI Events</span>
+    <span class="feed-sub">80%+ above 30-day avg</span>
+  </div>
+
+  <div *ngIf="loading" class="feed-msg">Scanning...</div>
+  <div *ngIf="!loading && !count" class="feed-msg feed-empty">
+    No anomalies detected — air quality within normal range globally
+  </div>
+
+  <div *ngFor="let a of anomalies" class="feed-item"
+    [style.background]="hoveredCode === a.code ? 'rgba(255,255,255,0.04)' : sev(a).bg"
+    (click)="select(a.code)"
+    (mouseenter)="hoveredCode = a.code"
+    (mouseleave)="hoveredCode = null">
+
+    <div class="item-top">
+      <div>
+        <span class="item-name">{{ a.name }}</span>
+        <span *ngIf="src(a)" class="item-src">{{ src(a).icon }}</span>
+      </div>
+      <span class="item-badge" [style.color]="sev(a).color" [style.border-color]="sev(a).color">
+        {{ sev(a).label }}
+      </span>
+    </div>
+
+    <div class="item-aqi-row">
+      <span class="item-aqi" [style.color]="info(a).col">{{ a.currentAqi }}</span>
+      <span class="item-meta">
+        vs <span class="item-base">{{ a.baselineAqi }}</span> avg
+        <span [style.color]="sev(a).color"> +{{ a.percentAbove }}%</span>
+      </span>
+    </div>
+
+    <div class="item-cat">{{ info(a).cat }} · Click to zoom</div>
+  </div>
+</div>
