@@ -83,3 +83,25 @@ body, .app {
   font-size: 12px; letter-spacing: 0.12em; padding-left: 40px;
 }
 @keyframes scrollticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+/* State panel */
+.state-panel {
+  position: fixed; right: 24px; top: 50%; transform: translateY(-50%);
+  width: 240px; background: rgba(2,5,16,0.95);
+  border: 1px solid #0d2a4a; border-radius: 2px;
+  padding: 20px 18px; z-index: 20;
+  font-family: 'Courier New', monospace; color: #8ba4c8;
+}
+.state-close { position: absolute; top: 10px; right: 12px; cursor: pointer; font-size: 13px; color: #2a4a6a; }
+.state-close:hover { color: #c8d8f0; }
+.state-sec { font-size: 9px; letter-spacing: 0.35em; color: #2a4a6a; text-transform: uppercase; margin-bottom: 8px; }
+.state-name { font-size: 16px; color: #c8d8f0; font-weight: bold; margin-bottom: 10px; letter-spacing: 0.06em; }
+.state-aqi-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.state-aqi { font-size: 52px; font-weight: bold; line-height: 1; }
+.state-cat { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; }
+.state-divider { border: none; border-top: 1px solid #0a1e38; margin: 14px 0; }
+.state-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 8px; color: #3a5a7a; }
+.state-val { color: #8ba4c8; }
+.state-advice { font-size: 10px; color: #3a5a7a; line-height: 1.7; margin-top: 8px; }
+.state-advice.warn { color: #ff7e00; }
+.state-nodata { font-size: 10px; color: #1a3a5a; margin-top: 8px; letter-spacing: 0.1em; font-style: italic; }

@@ -11,7 +11,8 @@
   [aqiData]="aqiData"
   [selectedCode]="selectedCode"
   [focusCountry]="focusCountry"
-  (countryClick)="onCountryClick($event)">
+  (countryClick)="onCountryClick($event)"
+  (stateClick)="onStateClick($event)">
 </app-globe>
 
 <!-- Top-left brand -->
@@ -37,12 +38,33 @@
   (zoomTo)="onAnomalyZoom($event)">
 </app-anomaly-feed>
 
-<!-- Info panel -->
+<!-- Info panel (country) -->
 <app-info-panel
   *ngIf="selectedCode"
   [countryCode]="selectedCode"
   (closePanel)="onClose()">
 </app-info-panel>
+
+<!-- State panel -->
+<div *ngIf="selectedState" class="state-panel" [style.border-left]="'2px solid ' + selectedState.col">
+  <span class="state-close" (click)="onClose()">✕</span>
+  <div class="state-sec">India — State View</div>
+  <div class="state-name">{{ selectedState.name }}</div>
+  <div class="state-aqi-row">
+    <span class="state-aqi" [style.color]="selectedState.col">{{ selectedState.aqi ?? '—' }}</span>
+    <span class="state-cat" [style.color]="selectedState.col">{{ selectedState.cat }}</span>
+  </div>
+  <div class="state-divider"></div>
+  <div class="state-sec">Health Advisory</div>
+  <div class="state-row"><span>Safe outdoors</span><span class="state-val">{{ selectedState.safe }}</span></div>
+  <div *ngIf="selectedState.aqi !== null && selectedState.aqi > 100" class="state-advice">
+    Wear a mask if spending extended time outdoors.
+  </div>
+  <div *ngIf="selectedState.aqi !== null && selectedState.aqi > 200" class="state-advice warn">
+    Avoid all outdoor activity. Air quality is hazardous.
+  </div>
+  <div *ngIf="selectedState.aqi === null" class="state-nodata">No monitoring data available for this state.</div>
+</div>
 
 <!-- AQI legend -->
 <div class="legend">

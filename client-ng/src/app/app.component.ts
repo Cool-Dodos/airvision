@@ -24,6 +24,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   aqiData: Record<string, any> = {};
   selectedCode: string | null = null;
+  selectedState: { name: string; aqi: number | null; col: string; cat: string; safe: string } | null = null;
   focusCountry: string | null = null;
   lastUpdated: Date | null = null;
   loading = true;
@@ -78,8 +79,12 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   get globalInfo() { return aqiInfo(parseFloat(this.globalAvg)); }
 
-  onCountryClick(code: string): void { this.selectedCode = code; }
-  onClose(): void { this.selectedCode = null; }
+  onCountryClick(code: string): void { this.selectedCode = code; this.selectedState = null; }
+  onClose(): void { this.selectedCode = null; this.selectedState = null; }
+  onStateClick(state: { name: string; aqi: number | null; col: string; cat: string; safe: string }): void {
+    this.selectedState = state;
+    this.selectedCode  = null;
+  }
 
   onAnomalyZoom(code: string): void {
     this.selectedCode = code;

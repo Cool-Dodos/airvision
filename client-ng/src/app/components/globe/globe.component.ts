@@ -140,6 +140,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     if (code && this.ready) this.zone.runOutsideAngular(() => this.zoomToCode(code));
   }
   @Output() countryClick = new EventEmitter<string>();
+  @Output() stateClick   = new EventEmitter<{ name: string; aqi: number | null; col: string; cat: string; safe: string }>();
 
   tooltip: { x: number; y: number; name: string; aqi: number | null; col: string; cat: string; safe: string; src?: any } | null = null;
   loadingBoundary = false;
@@ -231,7 +232,16 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       if (!geo) return;
       if (this.indiaMode && this.indiaFeatures.length) {
         const state = this.indiaFeatures.find(f => d3.geoContains(f, geo));
-        if (state) return; // state click — no drill-down yet
+        if (state) {
+          const name = state.properties?.shapeName || state.properties?.name || '';
+          const data = this.stateAqi[name];
+          const info = aqiInfo(data?.aqi);
+          const safe = safeOutdoorTime(data?.aqi ?? undefined);
+          this.zone.run(() => {
+            this.stateClick.emit({ name, aqi: data?.aqi ?? null, col: info.col, cat: info.cat, safe: safe.healthy });
+          });
+          return;
+        }
       }
       const feat = this.worldFeatures.find(f => d3.geoContains(f, geo));
       if (!feat) {
