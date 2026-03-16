@@ -85,7 +85,7 @@ let indiaStateAqiCached: Record<string, any> | null = null;
 async function loadIndiaStateAqi(): Promise<Record<string, any>> {
   if (indiaStateAqiCached) return indiaStateAqiCached;
   try {
-    const json = await fetch('/api/aqi/india/states').then(r => r.json());
+    const json = await fetch('https://airvision-xcg9.onrender.com/api/aqi/india/states').then(r => r.json());
     if (json.ok) indiaStateAqiCached = json.states;
     return indiaStateAqiCached || {};
   } catch { return {}; }
