@@ -22,7 +22,7 @@ Before you begin, ensure you have the following installed:
 
 ### 1. Clone the Project
 ```bash
-git clone https://github.com/Sidbad12/airvision.git
+git clone https://github.com/Cool-Dodos/airvision.git
 cd airvision
 ```
 
