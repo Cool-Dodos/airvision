@@ -11,27 +11,24 @@ import { safeOutdoorTime, SOURCE_TAGS } from '../../utils/health';
 
 const WORLD_50M        = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json';
 const INDIA_ID         = 356;
-const LABEL_SCALE      = 1.6;       // show country labels when zoomed >= 1.6x
-const INDIA_ENTER_MULT = 2.8;       // enter India state-mode at this zoom
-const INDIA_EXIT_MULT  = 2.0;       // exit India state-mode below this zoom
-const INDIA_CENTROID: [number, number] = [82.8, 21.7]; // geographic centroid [lon, lat]
+const LABEL_SCALE      = 1.6;
+const INDIA_ENTER_MULT = 2.8;
+const INDIA_EXIT_MULT  = 2.0;
+const INDIA_CENTROID: [number, number] = [82.8, 21.7];
+const HALF_PI = Math.PI / 2;
 
 const OCEAN_COLOR    = '#050e22';
 const NO_DATA_COLOR  = '#1e3050';
 const NO_DATA_STROKE = '#2a4060';
 const NO_DATA_OPC    = 0.85;
 
-// ── FIX: world-atlas stores feature IDs as plain integers (e.g. 76 for Brazil),
-//   but NUMERIC_TO_CODE may use ISO 3-digit zero-padded keys ("076").
-//   Try both to fix missing countries like Brazil, Australia, Argentina, etc.
 function codeFromId(id: number | string): string | undefined {
   if (id === undefined || id === null) return undefined;
-  const numericId = Number(id);
-  if (isNaN(numericId)) return undefined;
-  return NUMERIC_TO_CODE[String(numericId)];
+  const n = Number(id);
+  if (isNaN(n)) return undefined;
+  return NUMERIC_TO_CODE[String(n)];
 }
 
-// ── Abbreviated names so state labels fit inside small states/UTs
 const STATE_ABBR: Record<string, string> = {
   'Dadra and Nagar Haveli and Daman and Diu': 'DNHDD',
   'Andaman and Nicobar': 'A&N Isl.',
@@ -42,11 +39,25 @@ const STATE_ABBR: Record<string, string> = {
   'Madhya Pradesh': 'MP',
   'Andhra Pradesh': 'AP',
   'Uttar Pradesh': 'UP',
+  'Maharashtra': 'MH',
+  'Karnataka': 'KA',
+  'Tamil Nadu': 'TN',
+  'West Bengal': 'WB',
+  'Chhattisgarh': 'CG',
+  'Rajasthan': 'RJ',
+  'Gujarat': 'GJ',
+  'Telangana': 'TS',
+  'Jharkhand': 'JH',
+  'Haryana': 'HR',
+  'Punjab': 'PB',
+  'Odisha': 'OD',
+  'Orissa': 'OD',
+  'Uttarakhand': 'UK'
 };
 
-// ── Caches
+// ── Caches ─────────────────────────────────────────────────────────────────
 const boundaryCache: Record<string, any> = {};
-let indiaStatesGeoCached: any[] | null = null;
+let indiaStatesGeoJSONCached: any[] | null = null;
 
 async function fetchBoundary(iso2: string): Promise<any | null> {
   if (boundaryCache[iso2]) return boundaryCache[iso2];
@@ -60,13 +71,24 @@ async function fetchBoundary(iso2: string): Promise<any | null> {
 }
 
 async function loadIndiaStatesGeo(): Promise<any[]> {
-  if (indiaStatesGeoCached) return indiaStatesGeoCached;
+  if (indiaStatesGeoJSONCached) return indiaStatesGeoJSONCached;
   try {
-    const meta = await fetch('https://www.geoboundaries.org/api/current/gbOpen/IND/ADM1/').then(r => r.json());
-    const gj   = await fetch(meta.gjDownloadURL).then(r => r.json());
-    indiaStatesGeoCached = gj.type === 'FeatureCollection' ? gj.features : [gj];
-    return indiaStatesGeoCached!;
+    const gj = await fetch('/assets/india-states-simplified.json').then(r => r.json());
+    indiaStatesGeoJSONCached = gj.type === 'FeatureCollection' ? gj.features : [gj];
+    return indiaStatesGeoJSONCached!;
   } catch { return []; }
+}
+
+// Pre-fetched state AQI cache — loaded at globe startup
+let indiaStateAqiCached: Record<string, any> | null = null;
+
+async function loadIndiaStateAqi(): Promise<Record<string, any>> {
+  if (indiaStateAqiCached) return indiaStateAqiCached;
+  try {
+    const json = await fetch('/api/aqi/india/states').then(r => r.json());
+    if (json.ok) indiaStateAqiCached = json.states;
+    return indiaStateAqiCached || {};
+  } catch { return {}; }
 }
 
 @Component({
@@ -120,7 +142,12 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   @ViewChild('svgEl', { static: false }) svgRef!: ElementRef<SVGSVGElement>;
   @Input()  aqiData: Record<string, any> = {};
   @Input()  selectedCode: string | null = null;
+  @Input()  set focusCountry(code: string | null) {
+    if (code && this.ready) this.zone.runOutsideAngular(() => this.zoomToCode(code));
+  }
   @Output() countryClick = new EventEmitter<string>();
+
+  private worldFeatures: any[] = [];
 
   tooltip: { x: number; y: number; name: string; aqi: number | null; col: string; cat: string; safe: string; src?: any } | null = null;
   loadingBoundary = false;
@@ -141,7 +168,15 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   private stop?:  () => void;
   private stateAqi: Record<string, any> = {};
 
-  // RAF throttle — prevents Angular change detection on every mousemove pixel
+  private clipCircle: any;
+
+  // Label centroid cache
+  private labelCache: Array<{ geo: [number, number]; el: SVGTextElement }> = [];
+  private stateLabelCache: Array<{ geo: [number, number]; el: SVGTextElement }> = [];
+  private lastRotation: [number, number, number] = [0, 0, 0];
+  private labelsDirty = true;
+
+  // RAF throttle for mousemove
   private lastMouseX = 0;
   private lastMouseY = 0;
   private mouseRafPending = false;
@@ -172,6 +207,13 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   private opc(id: number | string): number  { return this.hasData(id) ? 0.75 : NO_DATA_OPC; }
   private strk(id: number | string): string { return this.hasData(id) ? '#020510' : NO_DATA_STROKE; }
 
+  // Backface culling
+  private isFacing(lonLat: [number, number]): boolean {
+    const rot = this.proj.rotate();
+    const angle = d3.geoDistance(lonLat, [-rot[0], -rot[1]]);
+    return angle < HALF_PI;
+  }
+
   // ── Build globe ───────────────────────────────────────────────────────────
   private build(): void {
     const el = this.svgRef.nativeElement;
@@ -183,13 +225,17 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     const svg = d3.select(el);
     svg.selectAll('*').remove();
 
-    // Glow filter
     const defs = svg.append('defs');
     const flt  = defs.append('filter').attr('id', 'glow');
     flt.append('feGaussianBlur').attr('stdDeviation', '2').attr('result', 'blur');
-    const fm   = flt.append('feMerge');
+    const fm = flt.append('feMerge');
     fm.append('feMergeNode').attr('in', 'blur');
     fm.append('feMergeNode').attr('in', 'SourceGraphic');
+
+    // Clip all geo layers to a circle matching the globe sphere
+    const clipPath = defs.append('clipPath').attr('id', 'globe-clip');
+    const clipCircle = this.clipCircle = clipPath.append('circle')
+      .attr('cx', W / 2).attr('cy', H / 2).attr('r', this.scale);
 
     this.proj = d3.geoOrthographic()
       .scale(this.scale).translate([W / 2, H / 2])
@@ -202,7 +248,6 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       .style('fill', OCEAN_COLOR).style('stroke', '#0a1e3a').style('stroke-width', '1.5')
       .style('cursor', 'crosshair')
       .on('click', () => {
-        // ── Fix 2: Ocean click deselects country
         this.zone.run(() => {
           this.selectedCode = null;
           this.gHighlight?.selectAll('*').remove();
@@ -210,71 +255,62 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
           this.countryClick.emit('');
         });
       });
+
     const grat = svg.append('path').datum(d3.geoGraticule()())
       .attr('d', path as any)
+      .attr('clip-path', 'url(#globe-clip)')
       .style('fill', 'none').style('stroke', '#071828')
       .style('stroke-width', '0.4').style('opacity', '0.5');
 
-    let mesh: any;
+    // ── Layer Setup (Strict Order for Z-Index) ──────────────────────────────
+    this.gCountries   = svg.append('g').attr('class', 'layer-countries').attr('clip-path', 'url(#globe-clip)');
+    this.gStates      = svg.append('g').attr('class', 'layer-states').attr('clip-path', 'url(#globe-clip)');
+    this.gHighlight   = svg.append('g').attr('class', 'layer-highlight').attr('clip-path', 'url(#globe-clip)').style('pointer-events', 'none');
+    this.gLabels      = svg.append('g').attr('class', 'layer-labels').style('pointer-events', 'none');
+    this.gStateLabels = svg.append('g').attr('class', 'layer-state-labels').style('pointer-events', 'none');
+
+    let meshLayer: any = svg.append('path').attr('class', 'layer-mesh').attr('clip-path', 'url(#globe-clip)')
+      .style('fill', 'none').style('stroke', '#020510').style('stroke-width', '0.3').style('pointer-events', 'none');
 
     let lastRedraw = 0;
     this.redraw = () => {
-      // ── Fix 4: Throttle redraw to ~30fps to save CPU/GPU
       const now = Date.now();
-      if (now - lastRedraw < 32) return; 
+      if (now - lastRedraw < 24) return;
       lastRedraw = now;
 
       sphere.attr('d', path as any);
+      clipCircle.attr('r', this.scale);
       grat.attr('d', path as any);
       this.gCountries?.selectAll('path').attr('d', path as any);
-      mesh?.attr('d', path as any);
+      meshLayer?.attr('d', path as any);
       this.gHighlight?.selectAll('path').attr('d', path as any);
       this.gStates?.selectAll('path').attr('d', path as any);
 
-      if (this.scale >= this.BASE * LABEL_SCALE && this.gLabels) {
-        this.gLabels.selectAll('text').each(function(this: SVGTextElement, d: any) {
-          const c = d3.geoCentroid(d), p = proj(c);
-          if (!p) { d3.select(this).style('display', 'none'); return; }
-          const ang = d3.geoDistance(c, [-proj.rotate()[0], -proj.rotate()[1]]);
-          d3.select(this)
-            .style('display', ang > Math.PI / 1.9 ? 'none' : 'block') // slightly tighter clip for labels
-            .attr('x', p[0]).attr('y', p[1]);
-        });
-      }
+      const rot = proj.rotate() as [number, number, number];
+      const rotChanged = rot[0] !== this.lastRotation[0] || rot[1] !== this.lastRotation[1];
+      if (rotChanged) { this.labelsDirty = true; this.lastRotation = [...rot] as [number, number, number]; }
 
-      if (this.indiaMode && this.gStateLabels) {
-        this.gStateLabels.selectAll('text').each(function(this: SVGTextElement, d: any) {
-          const c = d3.geoCentroid(d), p = proj(c);
-          if (!p) { d3.select(this).style('display', 'none'); return; }
-          const ang = d3.geoDistance(c, [-proj.rotate()[0], -proj.rotate()[1]]);
-          d3.select(this)
-            .style('display', ang > Math.PI / 1.9 ? 'none' : 'block')
-            .attr('x', p[0]).attr('y', p[1]);
-        });
+      if (this.labelsDirty) {
+        this.updateLabelPositions();
+        if (this.indiaMode) this.updateStateLabelPositions();
+        this.labelsDirty = false;
       }
     };
+
+    // Preload India states geo + AQI silently in background
+    loadIndiaStatesGeo();
+    loadIndiaStateAqi();
 
     Promise.all([
       d3.json(WORLD_50M),
       fetch('assets/india-official.json').then(r => r.json()),
     ]).then(([world, india]: [any, any]) => {
       let features = (topojson.feature(world, world.objects.countries) as any).features;
-
-      // Override India geometry with SOI boundary (includes PoK + Aksai Chin)
       features = features.map((f: any) =>
         String(f.id) === String(INDIA_ID) ? { ...f, geometry: india.geometry } : f
       );
-
-      // ── CRITICAL: render India LAST so its SOI polygon paints over
-      //   Pakistan's PoK territory and China's Aksai Chin territory
-      features.sort((a: any, b: any) => {
-        if (String(a.id) === String(INDIA_ID)) return 1;
-        if (String(b.id) === String(INDIA_ID)) return -1;
-        return 0;
-      });
-
-      // Country fills
-      this.gCountries = svg.append('g');
+      
+      this.worldFeatures = features;
       this.gCountries.selectAll('.cp').data(features).join('path').attr('class', 'cp')
         .attr('d', path as any)
         .style('fill',         (d: any) => this.fill(d.id))
@@ -302,7 +338,6 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
           });
         })
         .on('mousemove', (event: MouseEvent) => {
-          // RAF throttle: defer zone.run until next animation frame
           this.lastMouseX = event.clientX;
           this.lastMouseY = event.clientY;
           if (!this.mouseRafPending) {
@@ -326,7 +361,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
           if (!code) return;
           this.rotateToFeature(d);
           this.loadTier2(code, d);
-          if (String(d.id) === String(INDIA_ID)) {
+          if (code === 'IN') {
             this.zone.run(() => this.triggerIndiaMode());
           } else {
             this.zone.run(() => this.exitIndiaMode());
@@ -334,8 +369,8 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
           this.zone.run(() => this.countryClick.emit(code));
         });
 
-      // Country name labels (shown when zoomed in)
-      this.gLabels = svg.append('g').style('pointer-events', 'none');
+      // Country labels
+      this.labelCache = [];
       this.gLabels.selectAll('text').data(features).join('text')
         .style('font-family', "'Courier New', monospace")
         .style('font-size', '10px')
@@ -343,22 +378,21 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
         .style('letter-spacing', '0.08em')
         .style('text-shadow', '0 0 4px #020510, 0 0 8px #020510')
         .style('display', 'none')
-        .text((d: any) => { const c = codeFromId(d.id); return c && this.aqiData[c] ? this.aqiData[c].name || c : ''; })
-        .style('fill', (d: any) => this.hasData(d.id) ? '#c8d8f0' : '#4a6a8a');
+        .text((d: any) => {
+          const c = codeFromId(d.id);
+          return c && this.aqiData[c] ? this.aqiData[c].name || c : '';
+        })
+        .style('fill', (d: any) => this.hasData(d.id) ? '#c8d8f0' : '#4a6a8a')
+        .each((d: any, i: number, nodes: any) => {
+          const geo = d3.geoCentroid(d) as [number, number];
+          this.labelCache.push({ geo, el: nodes[i] });
+        });
 
-      this.gHighlight = svg.append('g').style('pointer-events', 'none');
-
-      // ── Country border mesh — EXCLUDE India-adjacent edges to remove PoK/Aksai seam lines.
-      //   India's own polygon stroke draws its outline, so nothing is lost visually.
-      mesh = svg.append('path')
-        .datum(topojson.mesh(world, world.objects.countries,
-          (a: any, b: any) =>
-            a !== b &&
-            String(a.id) !== String(INDIA_ID) &&
-            String(b.id) !== String(INDIA_ID)
-        ) as any)
-        .style('fill', 'none').style('stroke', '#020510').style('stroke-width', '0.3')
-        .attr('d', path as any);
+      // Mesh excluding India
+      meshLayer.datum(topojson.mesh(world, world.objects.countries,
+        (a: any, b: any) =>
+          a !== b && String(a.id) !== String(INDIA_ID) && String(b.id) !== String(INDIA_ID)
+      ) as any).attr('d', path as any);
 
       this.ready = true;
       this.refresh();
@@ -373,45 +407,62 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       this.stop = () => timer.stop();
     });
 
-    // Drag
+    // Drag and scale
     let origin: { x: number; y: number; rot: [number, number, number] } | null = null;
     svg.call(d3.drag<SVGSVGElement, unknown>()
-      .on('start', (e: any) => {
-        this.autoRot = false;
-        origin = { x: e.x, y: e.y, rot: [...proj.rotate()] as [number, number, number] };
-      })
+      .on('start', (e: any) => { this.autoRot = false; origin = { x: e.x, y: e.y, rot: [...proj.rotate()] as [number, number, number] }; })
       .on('drag', (e: any) => {
         if (!origin) return;
-        proj.rotate([
-          origin.rot[0] + (e.x - origin.x) * 0.28,
-          Math.max(-90, Math.min(90, origin.rot[1] - (e.y - origin.y) * 0.28)),
-        ]);
+        proj.rotate([origin.rot[0] + (e.x - origin.x) * 0.28, Math.max(-90, Math.min(90, origin.rot[1] - (e.y - origin.y) * 0.28))]);
         this.redraw();
       })
-      .on('end', () => {
-        this.checkIndiaZoom();
-        setTimeout(() => { this.autoRot = true; }, 3000);
-      })
-    );
+      .on('end', () => { this.checkIndiaZoom(); setTimeout(() => { this.autoRot = true; }, 3000); }));
 
-    // Scroll zoom
     svg.on('wheel', (event: WheelEvent) => {
       event.preventDefault();
       this.scale = Math.max(this.BASE * 0.5, Math.min(this.BASE * 5, this.scale - event.deltaY * 1.2));
       proj.scale(this.scale);
-      if (this.gLabels) {
-        this.gLabels.selectAll('text').style('display', this.scale >= this.BASE * LABEL_SCALE ? 'block' : 'none');
-      }
+      clipCircle.attr('r', this.scale);
+      const showLabels = this.scale >= this.BASE * LABEL_SCALE;
+      if (this.gLabels) this.gLabels.selectAll('text').style('display', showLabels ? 'block' : 'none');
       this.checkIndiaZoom();
+      this.labelsDirty = true;
       this.redraw();
     }, { passive: false } as any);
   }
 
-  // ── India mode: enter when zoomed + facing India, exit on zoom-out ─────────
+  // ── Updated Label Positioning ─────────────────────────────────────────────
+  private updateLabelPositions(): void {
+    if (!this.gLabels || this.scale < this.BASE * LABEL_SCALE) return;
+    const proj = this.proj;
+    for (const { geo, el } of this.labelCache) {
+      if (!this.isFacing(geo)) { el.style.display = 'none'; continue; }
+      const p = proj(geo);
+      if (!p) { el.style.display = 'none'; continue; }
+      el.style.display = 'block';
+      el.setAttribute('x', String(p[0])); el.setAttribute('y', String(p[1]));
+    }
+  }
+
+  private updateStateLabelPositions(): void {
+    if (!this.gStateLabels) return;
+    const proj = this.proj;
+    for (const { geo, el } of this.stateLabelCache) {
+      if (!this.isFacing(geo)) { el.style.display = 'none'; continue; }
+      const p = proj(geo);
+      if (!p) { el.style.display = 'none'; continue; }
+      el.style.display = 'block';
+      el.setAttribute('x', String(p[0])); el.setAttribute('y', String(p[1]));
+    }
+  }
+
+  // ── India Mode Trigger ───────────────────────────────────────────────────
   private checkIndiaZoom(): void {
     if (!this.ready) return;
-    const angle  = d3.geoDistance(INDIA_CENTROID, [-this.proj.rotate()[0], -this.proj.rotate()[1]]);
-    const facing = angle < Math.PI * 0.45;
+    const rot   = this.proj.rotate();
+    const angle = d3.geoDistance(INDIA_CENTROID, [-rot[0], -rot[1]]);
+    // Strict activation: only 20 degrees from India's center
+    const facing = angle < Math.PI * 0.12; 
     if (!this.indiaMode && this.scale >= this.BASE * INDIA_ENTER_MULT && facing) {
       this.zone.run(() => this.triggerIndiaMode());
     } else if (this.indiaMode && (this.scale < this.BASE * INDIA_EXIT_MULT || !facing)) {
@@ -422,78 +473,60 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   private triggerIndiaMode(): void {
     if (this.indiaMode) return;
     this.indiaMode = true;
+    // Force immediate hide with important flag if needed, but style() usually suffice
+    (this.gCountries?.selectAll('.cp') as any)
+      .filter((d: any) => codeFromId(d.id) === 'IN')
+      .style('display', 'none');
     this.loadAndDrawStates();
   }
 
   private exitIndiaMode(): void {
     if (!this.indiaMode) return;
     this.indiaMode = false;
-    this.gStates?.remove();      this.gStates      = null;
-    this.gStateLabels?.remove(); this.gStateLabels  = null;
+    (this.gCountries?.selectAll('.cp') as any)
+      .filter((d: any) => codeFromId(d.id) === 'IN')
+      .style('display', null);
+    this.gStates?.selectAll('*').remove();
+    this.gStateLabels?.selectAll('*').remove();
+    this.stateLabelCache = [];
   }
 
-  // ── India state layer ─────────────────────────────────────────────────────
+  // ── India State Layer ─────────────────────────────────────────────────────
   private loadAndDrawStates(): void {
     const svg = d3.select(this.svgRef.nativeElement);
     this.zone.run(() => { this.loadingBoundary = true; });
-    
-    // ── Final Fix: Load user-provided local boundary file (3MB)
-    fetch('/assets/india-states-new.json').then(r => {
-      if (!r.ok) throw new Error('Local asset not found');
-      return r.json();
-    }).then(gj => {
+
+    Promise.all([loadIndiaStatesGeo(), loadIndiaStateAqi()]).then(([features, stateAqi]) => {
       this.zone.run(() => { this.loadingBoundary = false; });
-      if (!this.indiaMode) return;
-      const features = gj.type === 'FeatureCollection' ? gj.features : [gj];
+      if (!this.indiaMode || !features.length) return;
+      this.stateAqi = stateAqi;
       this.drawStateLayer(svg, features);
-      
-      fetch('/api/aqi/india/states')
-        .then(r => r.json())
-        .then(json => {
-          if (json.ok) { 
-            this.stateAqi = json.states; 
-            this.colorStateLayer(); 
-          }
-        });
-    }).catch(err => {
-      console.error('Error loading India states:', err);
-      this.zone.run(() => { this.loadingBoundary = false; });
     });
   }
 
   private drawStateLayer(svg: any, features: any[]): void {
-    this.gStates?.remove();
-    this.gStateLabels?.remove();
+    this.gStates?.selectAll('*').remove();
+    this.gStateLabels?.selectAll('*').remove();
+    this.stateLabelCache = [];
     const path = this.path, proj = this.proj;
-
-    // Insert state layer just below gHighlight so highlight ring stays on top
-    const hlNode = this.gHighlight?.node();
-    this.gStates = hlNode ? svg.insert('g', () => hlNode) : svg.append('g');
-    this.gStates.attr('class', 'india-states');
 
     this.gStates.selectAll('.sp').data(features).join('path').attr('class', 'sp')
       .attr('d', path as any)
-      .style('fill', NO_DATA_COLOR)
-      .style('fill-opacity', 0.88)
-      .style('stroke', '#020510')
-      .style('stroke-width', '0.5')
+      .style('fill', (d: any) => {
+        const name = (d.properties?.shapeName || d.properties?.name || '') as string;
+        // Use transparent while loading or for missing data to avoid initial dark blue flash
+        return this.stateAqi[name] != null ? aqiInfo(this.stateAqi[name].aqi).col : (this.loadingBoundary ? 'rgba(0,0,0,0)' : NO_DATA_COLOR);
+      })
+      .style('fill-opacity', 1.0)
+      .style('stroke', '#020510').style('stroke-width', '0.5')
       .style('cursor', 'pointer')
       .on('mouseover', (event: MouseEvent, d: any) => {
         const name = (d.properties?.shapeName || d.properties?.name || 'State') as string;
         const data = this.stateAqi[name] ?? null;
         const info = aqiInfo(data?.aqi);
         const safe = safeOutdoorTime(data?.aqi ?? undefined);
-        d3.select(event.currentTarget as Element)
-          .style('fill-opacity', 1)
-          .style('stroke', '#ffffff55').style('stroke-width', '1.2');
-        this.zone.run(() => {
-          this.tooltip = { 
-            x: event.clientX, y: event.clientY, 
-            name, aqi: data?.aqi ?? null, 
-            col: info.col, cat: info.cat, 
-            safe: safe.healthy 
-          };
-        });
+        d3.select(event.currentTarget as Element).style('stroke', '#ffffff55').style('stroke-width', '1.2');
+        this.zone.run(() => { this.tooltip = { x: event.clientX, y: event.clientY, name, aqi: data?.aqi ?? null, col: info.col, cat: info.cat, safe: safe.healthy }; });
       })
       .on('mousemove', (event: MouseEvent) => {
         this.lastMouseX = event.clientX; this.lastMouseY = event.clientY;
@@ -501,53 +534,37 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
           this.mouseRafPending = true;
           requestAnimationFrame(() => {
             this.mouseRafPending = false;
-            const x = this.lastMouseX, y = this.lastMouseY;
-            this.zone.run(() => { if (this.tooltip) this.tooltip = { ...this.tooltip, x, y }; });
+            if (this.tooltip) { const { lastMouseX: x, lastMouseY: y } = this; this.zone.run(() => { this.tooltip = { ...this.tooltip!, x, y }; }); }
           });
         }
       })
       .on('mouseout', (event: MouseEvent, d: any) => {
         const name = (d.properties?.shapeName || d.properties?.name || '') as string;
         const data = this.stateAqi[name] ?? null;
-        d3.select(event.currentTarget as Element)
-          .style('fill-opacity', 0.88)
-          .style('fill', data != null ? aqiInfo(data.aqi).col : NO_DATA_COLOR)
-          .style('stroke', '#020510').style('stroke-width', '0.5');
+        d3.select(event.currentTarget as Element).style('stroke', '#020510').style('stroke-width', '0.5');
         this.zone.run(() => { this.tooltip = null; });
       });
 
-    // State name labels — font size based on projected area so they fit
-    this.gStateLabels = svg.append('g').style('pointer-events', 'none');
+    // State labels with dynamic sizing
     this.gStateLabels.selectAll('text').data(features).join('text')
-      .style('font-family', "'Courier New', monospace")
-      .style('text-anchor', 'middle').style('dominant-baseline', 'central')
-      .style('text-shadow', '0 0 3px #020510, 0 0 7px #020510')
-      .style('fill', '#d0e4f8')
-      .style('letter-spacing', '0.05em')
-      .each(function(this: SVGTextElement, d: any) {
-        const el   = d3.select(this);
+      .style('font-family', "'Courier New', monospace").style('text-anchor', 'middle')
+      .style('dominant-baseline', 'central').style('text-shadow', '0 0 3px #020510, 0 0 7px #020510')
+      .style('fill', '#ffffff').style('letter-spacing', '0.05em')
+      .each((d: any, i: number, nodes: any) => {
+        const el = d3.select(nodes[i]);
         const name = (d.properties?.shapeName || d.properties?.name || '') as string;
-
-        // Projected bounding box to determine font size + whether label fits
         const bounds = path.bounds(d);
-        const pw     = bounds ? Math.abs(bounds[1][0] - bounds[0][0]) : 0;
-        const ph     = bounds ? Math.abs(bounds[1][1] - bounds[0][1]) : 0;
-        const area   = pw * ph;
-        const fs     = Math.max(6, Math.min(11, Math.sqrt(area) * 0.055));
-
-        // Use abbreviated name for small states to avoid overflow
-        const abbr  = STATE_ABBR[name] || name;
-        const label = area < 1200 ? abbr.split(' ')[0] : abbr;
-
-        const c   = d3.geoCentroid(d);
-        const p   = proj(c);
-        const ang = d3.geoDistance(c, [-proj.rotate()[0], -proj.rotate()[1]]);
-
-        el.style('font-size', `${fs}px`)
-          .text(area > 300 ? label : '')
-          .attr('x', p ? p[0] : 0)
-          .attr('y', p ? p[1] : 0)
-          .style('display', (!p || ang > Math.PI / 2 || area < 300) ? 'none' : null as unknown as string);
+        const area = Math.abs((bounds[1][0] - bounds[0][0]) * (bounds[1][1] - bounds[0][1]));
+        const baseFs = Math.max(7, Math.min(13, Math.sqrt(area) * 0.06));
+        const zFs = baseFs * Math.max(1, this.scale / (this.BASE * INDIA_ENTER_MULT));
+        const label = area < 1000 ? (STATE_ABBR[name] || name) : name;
+        const geo = d3.geoCentroid(d) as [number, number];
+        const p = proj(geo);
+        const facing = this.isFacing(geo);
+        el.style('font-size', `${zFs}px`).style('font-weight', 'bold').text(area > 120 ? label : '')
+          .attr('x', p ? p[0] : 0).attr('y', p ? p[1] : 0)
+          .style('display', (!p || !facing || area < 120) ? 'none' : (null as any));
+        this.stateLabelCache.push({ geo, el: nodes[i] });
       });
   }
 
@@ -557,15 +574,28 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.gStates.selectAll('.sp')
       .style('fill', (d: any) => {
         const name = (d.properties?.shapeName || d.properties?.name || '') as string;
-        const data = sa[name] ?? null;
-        return data != null ? aqiInfo(data.aqi).col : NO_DATA_COLOR;
+        return sa[name] != null ? aqiInfo(sa[name].aqi).col : NO_DATA_COLOR;
       });
-    // Also update label color
     this.gStateLabels?.selectAll('text')
       .style('fill', (d: any) => {
         const name = (d.properties?.shapeName || d.properties?.name || '') as string;
         return sa[name] != null ? '#ffffff' : '#8ab0c8';
       });
+  }
+
+  // ── Programmatic zoom by ISO2 code (anomaly click) ───────────────────────
+  private zoomToCode(code: string): void {
+    const feat = this.worldFeatures.find(f => codeFromId(f.id) === code);
+    if (!feat) return;
+    this.scale = code === 'IN' ? this.BASE * INDIA_ENTER_MULT : this.BASE * 2.2;
+    this.proj.scale(this.scale);
+    this.clipCircle?.attr('r', this.scale);
+    this.gLabels?.selectAll('text').style('display', this.scale >= this.BASE * LABEL_SCALE ? 'block' : 'none');
+    this.rotateToFeature(feat);
+    this.loadTier2(code, feat);
+    if (code === 'IN') this.zone.run(() => this.triggerIndiaMode());
+    this.checkIndiaZoom();
+    this.zone.run(() => this.countryClick.emit(code));
   }
 
   // ── Smooth rotation to feature centroid ───────────────────────────────────
@@ -574,11 +604,15 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     const c = d3.geoCentroid(d);
     const i = d3.interpolate(this.proj.rotate(), [-c[0], -c[1]] as any);
     d3.transition().duration(900).ease(d3.easeCubicInOut)
-      .tween('r', () => (t: number) => { this.proj.rotate(i(t)); this.redraw(); })
+      .tween('r', () => (t: number) => {
+        this.proj.rotate(i(t));
+        this.labelsDirty = true;
+        this.redraw();
+      })
       .on('end', () => setTimeout(() => { this.autoRot = true; }, 8000));
   }
 
-  // ── Tier-2: precise boundary on click (lazy, cached) ─────────────────────
+  // ── Tier-2: precise boundary on click ────────────────────────────────────
   private loadTier2(iso2: string, d: any): void {
     this.gHighlight?.selectAll('*').remove();
     const col = this.aqiData[iso2] ? aqiInfo(this.aqiData[iso2].avgAqi).col : '#2a5a8a';
@@ -596,16 +630,27 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     });
   }
 
-  // ── Refresh fill colors when aqiData input changes ────────────────────────
+  // ── Refresh fill colors when aqiData changes ──────────────────────────────
   private refresh(): void {
     if (!this.gCountries) return;
     this.gCountries.selectAll('.cp')
       .style('fill',         (d: any) => this.fill(d.id))
       .style('fill-opacity', (d: any) => this.opc(d.id))
       .style('stroke',       (d: any) => this.strk(d.id))
-      .style('stroke-width', (d: any) => this.hasData(d.id) ? '0.4' : '0.5');
+      .style('stroke-width', (d: any) => this.hasData(d.id) ? '0.4' : '0.5')
+      .style('display', (d: any) => (this.indiaMode && codeFromId(d.id) === 'IN') ? 'none' : (null as any));
+    
     this.gLabels?.selectAll('text')
       .text((d: any) => { const c = codeFromId(d.id); return c && this.aqiData[c] ? this.aqiData[c].name || c : ''; })
-      .style('fill', (d: any) => this.hasData(d.id) ? '#c8d8f0' : '#4a6a8a');
+      .style('fill', (d: any) => this.hasData(d.id) ? '#c8d8f0' : '#4a6a8a')
+      .style('display', (d: any) => (this.indiaMode && codeFromId(d.id) === 'IN') ? 'none' : (this.scale >= this.BASE * LABEL_SCALE ? 'block' : 'none'));
+    
+    if (this.indiaMode) {
+      this.colorStateLayer();
+      this.labelsDirty = true;
+      this.redraw();
+    }
+    
+    this.labelsDirty = true;
   }
 }

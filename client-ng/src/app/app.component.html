@@ -1,50 +1,64 @@
-<div class="app">
-  <canvas #starCanvas class="starfield"></canvas>
-  <div class="scanlines"></div>
+<canvas #starCanvas class="starfield"></canvas>
+<div class="scanlines"></div>
 
-  <div *ngIf="loading" class="loading-screen">
-    <div class="loading-text">Initializing AQI Monitor</div>
+<div *ngIf="loading" class="loading-screen">
+  <div class="loading-text">Initialising AirVision Global…</div>
+</div>
+<div *ngIf="error" class="error-banner">⚠ {{ error }}</div>
+
+<!-- Globe -->
+<app-globe
+  [aqiData]="aqiData"
+  [selectedCode]="selectedCode"
+  [focusCountry]="focusCountry"
+  (countryClick)="onCountryClick($event)">
+</app-globe>
+
+<!-- Top-left brand -->
+<div class="header">
+  <div class="brand-label">Real-time Air Quality</div>
+  <div class="brand-title">AirVision<br>Global</div>
+  <div class="brand-sub">Live AQI Monitor</div>
+</div>
+
+<!-- Top-right: global AQI + anomalies stacked below -->
+<div class="top-right">
+  <div class="gai-label">Global AQI Avg</div>
+  <div class="gai-value" [style.color]="globalInfo.col">{{ globalAvg }}</div>
+  <div class="gai-status" [style.color]="globalInfo.col">{{ globalInfo.cat }}</div>
+  <div *ngIf="lastUpdated" class="gai-time">
+    <span class="live-dot"></span>{{ lastUpdated | date:'HH:mm' }} UTC
   </div>
-  <div *ngIf="error" class="error-banner">{{ error }} — retrying...</div>
+</div>
 
-  <app-globe [aqiData]="aqiData" [selectedCode]="selectedCode" (countryClick)="onCountryClick($event)"></app-globe>
+<!-- Anomaly feed (button positioned top-right below global AQI via CSS) -->
+<app-anomaly-feed
+  (countryClick)="onCountryClick($event)"
+  (zoomTo)="onAnomalyZoom($event)">
+</app-anomaly-feed>
 
-  <!-- Header -->
-  <div class="header">
-    <div class="brand-label">Global Air Quality</div>
-    <div class="brand-title">AirVision<br/>Global</div>
-    <div class="brand-sub">v1.1 · MEAN Stack</div>
+<!-- Info panel -->
+<app-info-panel
+  *ngIf="selectedCode"
+  [countryCode]="selectedCode"
+  (closePanel)="onClose()">
+</app-info-panel>
+
+<!-- AQI legend -->
+<div class="legend">
+  <div class="leg-title">AQI Level</div>
+  <div *ngFor="let l of legend" class="leg-item">
+    <span class="leg-swatch" [style.background]="l.col"></span>
+    {{ l.label }}
   </div>
+</div>
 
-  <!-- Top right -->
-  <div class="top-right">
-    <div class="gai-label">Global Avg AQI</div>
-    <div class="gai-value" [style.color]="globalInfo.col">{{ globalAvg }}</div>
-    <div class="gai-status" [style.color]="globalInfo.col">
-      <span class="live-dot"></span>LIVE · {{ globalVals.length }} countries
-    </div>
-    <div *ngIf="lastUpdated" class="gai-time">Updated {{ lastUpdated | date:'HH:mm:ss' }}</div>
-  </div>
+<div class="hint">Drag to rotate · Scroll to zoom · Click country for details</div>
 
-  <!-- Legend -->
-  <div class="legend">
-    <div class="leg-title">AQI Level</div>
-    <div class="leg-item" *ngFor="let l of legend">
-      <div class="leg-swatch" [style.background]="l.col"></div>{{ l.label }}
-    </div>
-  </div>
-
-  <!-- Anomaly feed -->
-  <app-anomaly-feed (countryClick)="onCountryClick($event)"></app-anomaly-feed>
-
-  <!-- Info panel -->
-  <app-info-panel [countryCode]="selectedCode" (closePanel)="onClose()"></app-info-panel>
-
-  <div class="hint">Scroll to zoom · names appear when zoomed · click any country</div>
-
-  <!-- Ticker -->
-  <div class="ticker">
-    <div class="ticker-label">AQI Feed</div>
-    <div class="ticker-track"><div class="ticker-inner" #tickerInner></div></div>
+<!-- Ticker -->
+<div class="ticker">
+  <span class="ticker-label">AQI Feed</span>
+  <div class="ticker-track">
+    <div #tickerInner class="ticker-inner"></div>
   </div>
 </div>

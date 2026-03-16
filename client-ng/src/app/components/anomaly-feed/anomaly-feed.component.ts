@@ -13,6 +13,7 @@ import { ANOMALY_SEVERITY, SOURCE_TAGS } from '../../utils/health';
 })
 export class AnomalyFeedComponent implements OnInit, OnDestroy {
   @Output() countryClick = new EventEmitter<string>();
+  @Output() zoomTo = new EventEmitter<string>();
 
   anomalies: any[] = [];
   open = false;
@@ -50,6 +51,7 @@ export class AnomalyFeedComponent implements OnInit, OnDestroy {
 
   select(code: string): void {
     this.countryClick.emit(code);
+    this.zoomTo.emit(code);
     this.open = false;
   }
 }

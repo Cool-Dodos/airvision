@@ -37,16 +37,16 @@ body, .app {
 
 /* Header */
 .header { position: fixed; top: 22px; left: 24px; z-index: 20; user-select: none; }
-.brand-label { font-size: 9px; letter-spacing: 0.45em; color: #2a4a6a; text-transform: uppercase; margin-bottom: 2px; }
-.brand-title { font-size: 20px; letter-spacing: 0.12em; color: #c8d8f0; font-weight: bold; line-height: 1.1; text-transform: uppercase; }
-.brand-sub { font-size: 9px; letter-spacing: 0.3em; color: #2a4a6a; margin-top: 3px; }
+.brand-label { font-size: 10px; letter-spacing: 0.4em; color: #3a5a7a; text-transform: uppercase; margin-bottom: 3px; }
+.brand-title { font-size: 26px; letter-spacing: 0.14em; color: #d8e8ff; font-weight: bold; line-height: 1.1; text-transform: uppercase; }
+.brand-sub { font-size: 11px; letter-spacing: 0.3em; color: #3a5a7a; margin-top: 4px; }
 
 /* Top right */
 .top-right { position: fixed; top: 22px; right: 24px; z-index: 20; text-align: right; user-select: none; }
-.gai-label { font-size: 9px; letter-spacing: 0.3em; color: #2a4a6a; text-transform: uppercase; }
-.gai-value { font-size: 40px; font-weight: bold; line-height: 1; letter-spacing: 0.05em; }
-.gai-status { font-size: 10px; letter-spacing: 0.25em; margin-top: 2px; }
-.gai-time { font-size: 9px; color: #1a3a5a; margin-top: 4px; letter-spacing: 0.1em; }
+.gai-label { font-size: 10px; letter-spacing: 0.28em; color: #3a6080; text-transform: uppercase; }
+.gai-value { font-size: 54px; font-weight: bold; line-height: 1; letter-spacing: 0.05em; }
+.gai-status { font-size: 12px; letter-spacing: 0.22em; margin-top: 3px; }
+.gai-time { font-size: 10px; color: #2a4a6a; margin-top: 4px; letter-spacing: 0.1em; }
 .live-dot {
   display: inline-block; width: 7px; height: 7px;
   background: #00e400; border-radius: 50%; margin-right: 6px;
@@ -56,14 +56,14 @@ body, .app {
 
 /* Legend */
 .legend { position: fixed; bottom: 52px; left: 24px; z-index: 20; user-select: none; }
-.leg-title { font-size: 9px; letter-spacing: 0.35em; color: #2a4a6a; text-transform: uppercase; margin-bottom: 10px; }
-.leg-item { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; font-size: 10px; letter-spacing: 0.12em; color: #5a7a9a; }
+.leg-title { font-size: 10px; letter-spacing: 0.32em; color: #3a6080; text-transform: uppercase; margin-bottom: 10px; }
+.leg-item { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 12px; letter-spacing: 0.1em; color: #7a9ab8; }
 .leg-swatch { width: 28px; height: 6px; border-radius: 2px; flex-shrink: 0; }
 
 /* Hint */
 .hint {
   position: fixed; bottom: 52px; left: 50%; transform: translateX(-50%);
-  font-size: 10px; letter-spacing: 0.2em; color: #1a3a5a; z-index: 20;
+  font-size: 11px; letter-spacing: 0.18em; color: #2a4a6a; z-index: 20;
   text-align: center; pointer-events: none; text-transform: uppercase;
 }
 
@@ -74,12 +74,12 @@ body, .app {
   display: flex; align-items: center; overflow: hidden; z-index: 20;
 }
 .ticker-label {
-  flex-shrink: 0; padding: 0 16px; font-size: 9px; letter-spacing: 0.3em;
-  color: #1a3a5a; border-right: 1px solid #0d2a4a; text-transform: uppercase; white-space: nowrap;
+  flex-shrink: 0; padding: 0 16px; font-size: 10px; letter-spacing: 0.28em;
+  color: #2a4a6a; border-right: 1px solid #0d2a4a; text-transform: uppercase; white-space: nowrap;
 }
 .ticker-track { overflow: hidden; flex: 1; height: 100%; display: flex; align-items: center; }
 .ticker-inner {
   white-space: nowrap; animation: scrollticker 200s linear infinite;
-  font-size: 10px; letter-spacing: 0.15em; padding-left: 40px;
+  font-size: 12px; letter-spacing: 0.12em; padding-left: 40px;
 }
 @keyframes scrollticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }

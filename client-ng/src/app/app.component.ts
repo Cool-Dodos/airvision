@@ -24,6 +24,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   aqiData: Record<string, any> = {};
   selectedCode: string | null = null;
+  focusCountry: string | null = null;
   lastUpdated: Date | null = null;
   loading = true;
   error: string | null = null;
@@ -79,6 +80,12 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onCountryClick(code: string): void { this.selectedCode = code; }
   onClose(): void { this.selectedCode = null; }
+
+  onAnomalyZoom(code: string): void {
+    this.selectedCode = code;
+    this.focusCountry = null;
+    setTimeout(() => { this.focusCountry = code; });
+  }
 
   private drawStarfield(): void {
     const c = this.starRef.nativeElement;
