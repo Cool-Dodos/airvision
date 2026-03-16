@@ -105,3 +105,15 @@ body, .app {
 .state-advice { font-size: 10px; color: #3a5a7a; line-height: 1.7; margin-top: 8px; }
 .state-advice.warn { color: #ff7e00; }
 .state-nodata { font-size: 10px; color: #1a3a5a; margin-top: 8px; letter-spacing: 0.1em; font-style: italic; }
+
+/* Legend Note */
+.leg-note {
+  font-size: 9px;
+  color: #3a5a7a;
+  margin-top: 15px;
+  max-width: 170px;
+  line-height: 1.5;
+  letter-spacing: 0.05em;
+  font-style: italic;
+  opacity: 0.8;
+}

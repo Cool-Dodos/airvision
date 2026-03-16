@@ -245,7 +245,13 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       }
       const feat = this.worldFeatures.find(f => d3.geoContains(f, geo));
       if (!feat) {
-        this.zone.run(() => { this.selectedCode = null; this.highlightFeat = null; this.exitIndiaMode(); this.countryClick.emit(''); this.dirty = true; });
+        this.zone.run(() => {
+          this.selectedCode = null;
+          this.highlightFeat = null;
+          if (!this.indiaMode) this.exitIndiaMode();
+          this.countryClick.emit('');
+          this.dirty = true;
+        });
         return;
       }
       const code = codeFromId(feat.id);
