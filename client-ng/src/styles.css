@@ -7,6 +7,8 @@ body, .app {
   overflow: hidden;
   width: 100vw;
   height: 100vh;
+}
+:root {
   --ctrl-right: 24px;
 }
 .app.has-panel {
@@ -57,7 +59,8 @@ body, .app {
 .gai-time { font-size: 10px; color: #2a4a6a; margin-top: 4px; letter-spacing: 0.1em; }
 .live-dot {
   display: inline-block; width: 7px; height: 7px;
-  background: #00e400; border-radius: 50%; margin-right: 6px;
+  background: #00b894; border-radius: 50%; margin-right: 6px;
+  box-shadow: 0 0 8px #00b894;
   animation: blink 1.4s ease-in-out infinite;
 }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
@@ -99,6 +102,10 @@ body, .app {
   border: 1px solid #0d2a4a; border-radius: 2px;
   padding: 20px 18px; z-index: 20;
   font-family: 'Courier New', monospace; color: #8ba4c8;
+  display: none; pointer-events: none;
+}
+.state-panel.panel-visible {
+  display: block; pointer-events: auto;
 }
 .state-close { cursor: pointer; font-size: 13px; color: #2a4a6a; }
 .state-close:hover { color: #c8d8f0; }
@@ -164,3 +171,10 @@ body, .app {
   letter-spacing: 0.1em; transition: color 0.2s;
 }
 .share-btn:hover { color: #8ba4c8; }
+
+app-info-panel {
+  display: none; pointer-events: none;
+}
+app-info-panel.panel-visible {
+  display: block; pointer-events: auto;
+}

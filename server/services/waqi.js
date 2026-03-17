@@ -389,7 +389,7 @@ const INDIA_STATES = {
   'Jharkhand':           { cities: ['Ranchi', 'Jamshedpur', 'Dhanbad'], geo: [23.34, 85.31] },
   'Karnataka':           { cities: ['Bengaluru', 'Bagalkot', 'Chamarajanagar', 'Hassan', 'Madikeri', 'Ramanagara', 'Shivamogga', 'Tumakuru'], geo: [12.97, 77.59] },
   'Kerala':              { cities: ['Kochi', 'Kollam', 'Kannur', 'Eloor'], geo: [9.94, 76.26] },
-  'Ladakh':              { cities: ['Leh', 'Srinagar'], geo: [34.16, 77.58] },
+  'Ladakh':              { cities: ['Leh', 'Kargil'], geo: [34.16, 77.58] },
   'Lakshadweep':         { cities: ['Kavaratti', 'Kochi'], geo: [10.57, 72.64] },
   'Madhya Pradesh':      { cities: ['Bhopal', 'Indore', 'Gwalior', 'Jabalpur', 'Mandideep', 'Ratlam', 'Singrauli', 'Damoh', 'Pithampur'], geo: [23.26, 77.40] },
   'Maharashtra':         { cities: ['Mumbai', 'Aurangabad', 'Kalyan', 'Mahabaleshwar', 'Matheran', 'Nagpur', 'Nashik', 'Navi Mumbai', 'Pune', 'Solapur', 'Thane'], geo: [19.08, 72.88] },

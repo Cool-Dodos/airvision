@@ -11,6 +11,7 @@ import { AnomalyFeedComponent } from './components/anomaly-feed/anomaly-feed.com
 import { ShareCardComponent } from './components/share-card/share-card.component';
 import { HistorySliderComponent } from './components/history-slider/history-slider.component';
 import { aqiInfo } from './utils/aqi';
+import { ShareData } from './models/share-data.model';
 
 const REFRESH = 120000; // 2 mins
 
@@ -39,13 +40,13 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   indiaMode = false;
 
   readonly legend = [
-    { col: '#1e3050', label: 'No Data' },
-    { col: '#00e400', label: 'Good ≤50' },
-    { col: '#ffff00', label: 'Moderate 51–100' },
-    { col: '#ff7e00', label: 'Sensitive 101–150' },
-    { col: '#ff0000', label: 'Unhealthy 151–200' },
-    { col: '#8f3f97', label: 'Very Unhealthy 201–300' },
-    { col: '#7e0023', label: 'Hazardous >300' },
+    { col: '#1e3050', label: 'No Data'             },
+    { col: '#00b894', label: 'Good ≤50'            },
+    { col: '#fdcb6e', label: 'Moderate 51–100'     },
+    { col: '#e17055', label: 'Sensitive 101–150'   },
+    { col: '#d63031', label: 'Unhealthy 151–200'   },
+    { col: '#6c5ce7', label: 'Very Unhealthy 201–300' },
+    { col: '#a8071a', label: 'Hazardous >300'      },
   ];
 
   private intervalId: any;
@@ -96,8 +97,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onCountryClick(code: string): void { 
     this.selectedState = null;
-    this.selectedCode = null; 
-    setTimeout(() => { this.selectedCode = code; });
+    this.selectedCode = code;
   }
 
   onClose() {
@@ -109,16 +109,17 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   onStateShare() {
     if (!this.selectedState) return;
-    this.shareData = {
-      name: this.selectedState.name,
-      city: 'India State',
-      aqi: this.selectedState.aqi,
-      cat: this.selectedState.cat,
-      col: this.selectedState.col,
-      safe: this.selectedState.safe,
+    const shareData: ShareData = {
+      name:        this.selectedState.name,
+      city:        'India State',
+      aqi:         this.selectedState.aqi,
+      cat:         this.selectedState.cat,
+      col:         this.selectedState.col,
+      safe:        this.selectedState.safe,
       dominentpol: 'pm25',
-      iaqi: { pm25: this.selectedState.aqi }
+      iaqi:        { pm25: this.selectedState.aqi },
     };
+    this.shareData = shareData;
     console.log('State shared:', this.shareData);
   }
 
@@ -130,18 +131,13 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   onStateClick(state: any): void {
     console.log('State clicked:', state);
     this.selectedCode = null;
-    this.selectedState = null;
-    setTimeout(() => { this.selectedState = state; });
+    this.selectedState = state;
   }
 
   onAnomalyZoom(code: string): void {
-    this.selectedCode = null;
+    this.selectedCode = code;
     this.selectedState = null;
-    this.focusCountry = null;
-    setTimeout(() => { 
-      this.selectedCode = code;
-      this.focusCountry = code; 
-    });
+    this.focusCountry = code;
   }
 
   private drawStarfield(): void {

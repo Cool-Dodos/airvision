@@ -7,14 +7,49 @@ export interface AqiInfo {
 
 export function aqiInfo(v: number | null | undefined): AqiInfo {
   if (v === null || v === undefined || isNaN(v as number)) {
-    return { cat: 'NO DATA', col: '#1e3050', textCol: '#4a6a8a', advice: 'No data available for this region.' };
+    return {
+      cat: 'NO DATA',
+      col: '#1e3050',
+      textCol: '#4a6a8a',
+      advice: 'No data available for this region.'
+    };
   }
-  if (v <= 50)  return { cat: 'GOOD',                        col: '#00e400', textCol: '#004400', advice: 'Air quality is satisfactory. Enjoy outdoor activities.' };
-  if (v <= 100) return { cat: 'MODERATE',                    col: '#ffff00', textCol: '#444400', advice: 'Sensitive individuals should limit prolonged outdoor exertion.' };
-  if (v <= 150) return { cat: 'UNHEALTHY FOR SENSITIVE',     col: '#ff7e00', textCol: '#5a2a00', advice: 'People with heart/lung disease, elderly, and children should reduce outdoor exertion.' };
-  if (v <= 200) return { cat: 'UNHEALTHY',                   col: '#ff0000', textCol: '#5a0000', advice: 'Everyone may experience health effects. Avoid prolonged outdoor activity.' };
-  if (v <= 300) return { cat: 'VERY UNHEALTHY',              col: '#8f3f97', textCol: '#f0d0f5', advice: 'Health alert — serious effects for everyone. Stay indoors. Wear N95 mask if outside.' };
-  return               { cat: 'HAZARDOUS',                   col: '#7e0023', textCol: '#ffd0d8', advice: 'Emergency conditions. Stay indoors. Seal windows and doors. Avoid all outdoor activity.' };
+  if (v <= 50)  return {
+    cat: 'GOOD',
+    col: '#00b894',          // teal-green — readable on dark
+    textCol: '#004d3d',
+    advice: 'Air quality is satisfactory. Enjoy outdoor activities.'
+  };
+  if (v <= 100) return {
+    cat: 'MODERATE',
+    col: '#fdcb6e',          // warm amber gold
+    textCol: '#5a4200',
+    advice: 'Sensitive individuals should limit prolonged outdoor exertion.'
+  };
+  if (v <= 150) return {
+    cat: 'UNHEALTHY FOR SENSITIVE',
+    col: '#e17055',          // salmon-orange
+    textCol: '#5a1e00',
+    advice: 'People with heart/lung disease, elderly, and children should reduce outdoor exertion.'
+  };
+  if (v <= 200) return {
+    cat: 'UNHEALTHY',
+    col: '#d63031',          // ruby
+    textCol: '#4a0000',
+    advice: 'Everyone may experience health effects. Avoid prolonged outdoor activity.'
+  };
+  if (v <= 300) return {
+    cat: 'VERY UNHEALTHY',
+    col: '#6c5ce7',          // electric violet
+    textCol: '#e0d8ff',
+    advice: 'Health alert — serious effects for everyone. Stay indoors. Wear N95 mask if outside.'
+  };
+  return {
+    cat: 'HAZARDOUS',
+    col: '#a8071a',          // deep crimson
+    textCol: '#ffe0e4',
+    advice: 'Emergency conditions. Stay indoors. Seal windows and doors.'
+  };
 }
 
 export const POLLUTANT_LABELS: Record<string, string> = {

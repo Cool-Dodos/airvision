@@ -4,6 +4,7 @@ import { forkJoin, timeout } from 'rxjs';
 import { AqiService } from '../../services/aqi.service';
 import { aqiInfo, POLLUTANT_LABELS } from '../../utils/aqi';
 import { safeOutdoorTime, bestHourAdvice, maskAdvice, POLLUTANT_EFFECTS, SOURCE_TAGS, getDosAndDonts } from '../../utils/health';
+import { ShareData } from '../../models/share-data.model';
 
 @Component({
   selector: 'app-info-panel',
@@ -31,7 +32,12 @@ export class InfoPanelComponent implements OnChanges {
   ngOnInit(): void { if (this.countryCode) this.loadData(); }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['countryCode'] && this.countryCode) {
+    const change = changes['countryCode'];
+    if (
+      change &&
+      change.currentValue &&
+      change.currentValue !== change.previousValue
+    ) {
       this.loadData();
     }
   }
@@ -140,16 +146,18 @@ export class InfoPanelComponent implements OnChanges {
   aqiColor(v: number): string { return aqiInfo(v).col; }
 
   onShare(): void {
-    console.log('onShare called', this.detail, this.info);
     if (!this.detail || !this.info) return;
-    this.share.emit({
-      name: this.detail.countryName || this.detail.name,
-      city: this.detail.city,
-      aqi: this.aqiValue,
-      cat: this.info.cat,
-      col: this.info.col,
-      safe: this.safeTime.healthy,
-      dominentpol: this.dom
-    });
+    const shareData: ShareData = {
+      name:        this.detail.countryName || this.detail.name || 'Unknown',
+      city:        this.detail.city        ?? null,
+      aqi:         this.aqiValue           ?? null,
+      cat:         this.info.cat,
+      col:         this.info.col,
+      safe:        this.safeTime.healthy,
+      dominentpol: this.dom                ?? null,
+      iaqi:        this.detail.iaqi        ?? {},
+    };
+    console.log('onShare emitting', shareData);
+    this.share.emit(shareData);
   }
 }

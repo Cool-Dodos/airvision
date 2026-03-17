@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -54,14 +54,14 @@ import { FormsModule } from '@angular/forms';
       color: #8ba4c8; padding: 1px 6px; font-size: 8px; cursor: pointer; border-radius: 4px; 
       text-transform: uppercase; transition: all 0.2s;
     }
-    .live-btn.active { background: #00e400; color: #000; border-color: #00e400; font-weight: bold; }
+    .live-btn.active { background: #00b894; color: #000; border-color: #00b894; font-weight: bold; }
 
     .slider-body { margin-top: 4px; }
     .time-label { font-size: 10px; color: #c8d8f0; font-weight: bold; margin-bottom: 8px; letter-spacing: 0.05em; }
     
     .time-slider {
       width: 100%; cursor: pointer; height: 2px;
-      accent-color: #00e400; -webkit-appearance: none; background: rgba(255, 255, 255, 0.1); 
+      accent-color: #00b894; -webkit-appearance: none; background: rgba(255, 255, 255, 0.1); 
       outline: none; margin: 4px 0; border-radius: 1px;
     }
     .time-slider::-webkit-slider-thumb { 
@@ -72,7 +72,7 @@ import { FormsModule } from '@angular/forms';
     .ticks { display: flex; justify-content: space-between; margin-top: 4px; font-size: 7px; color: #3a5a7a; letter-spacing: 0.1em; }
   `]
 })
-export class HistorySliderComponent implements OnInit {
+export class HistorySliderComponent implements OnInit, OnChanges {
   @Input() snapshots: any[] = [];
   @Output() timeSelect = new EventEmitter<string | null>();
 

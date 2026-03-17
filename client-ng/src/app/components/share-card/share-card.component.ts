@@ -6,7 +6,7 @@ import { CommonModule } from '@angular/common';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="share-overlay" (click)="close.emit()">
+    <div *ngIf="data?.aqi != null" class="share-overlay" (click)="close.emit()">
       <div class="share-modal" (click)="$event.stopPropagation()">
         <span class="close-btn" (click)="close.emit()">✕</span>
         

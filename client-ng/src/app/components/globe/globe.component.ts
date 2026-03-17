@@ -17,10 +17,10 @@ const INDIA_ENTER_MULT = 2.8;
 const INDIA_EXIT_MULT  = 2.0;
 const INDIA_CENTROID: [number, number] = [82.8, 21.7];
 const HALF_PI = Math.PI / 2;
-const OCEAN_COLOR   = '#050e22';
-const NO_DATA_COLOR = '#1e3050';
-const NO_DATA_STROKE= '#2a4060';
-const GRAT_COLOR    = '#071828';
+const OCEAN_COLOR    = '#040c1e';
+const NO_DATA_COLOR  = '#14253d';
+const NO_DATA_STROKE = '#1e3250';
+const GRAT_COLOR     = '#091520';
 const SPHERE_STROKE = '#0a1e3a';
 
 function codeFromId(id: number | string): string | undefined {
@@ -59,6 +59,8 @@ const STATE_ABBR: Record<string, string> = {
 const boundaryCache: Record<string, any> = {};
 let indiaStatesGeoJSONCached: any[] | null = null;
 let indiaStateAqiCached: Record<string, any> | null = null;
+let indiaStateAqiCachedAt: number = 0;
+const INDIA_STATE_TTL = 30 * 60 * 1000; // 30 min
 let officialIndiaGeo: any | null = null;
 
 async function fetchBoundary(iso2: string): Promise<any | null> {
@@ -86,15 +88,21 @@ async function loadIndiaStatesGeo(): Promise<any[]> {
 }
 
 async function loadIndiaStateAqi(): Promise<Record<string, any>> {
-  if (indiaStateAqiCached) return indiaStateAqiCached;
+  const now = Date.now();
+  if (indiaStateAqiCached && (now - indiaStateAqiCachedAt) < INDIA_STATE_TTL) {
+    return indiaStateAqiCached;
+  }
   try {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), 12000);
-    const json = await fetch('http://localhost:5000/api/aqi/india/states', { signal: controller.signal }).then(r => r.json());
+    const json = await fetch('/api/aqi/india/states', { signal: controller.signal }).then(r => r.json());
     clearTimeout(id);
-    if (json.ok) indiaStateAqiCached = json.states;
+    if (json.ok) {
+      indiaStateAqiCached = json.states;
+      indiaStateAqiCachedAt = now;
+    }
     return indiaStateAqiCached || {};
-  } catch { return {}; }
+  } catch { return indiaStateAqiCached || {}; }
 }
 
 @Component({
@@ -178,6 +186,10 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   private hoveredId:      number | string | null = null;
   private hoveredState:   string | null = null;
 
+  private neighborFeatures: Map<string, any> = new Map();
+  private onMouseMove?: (e: MouseEvent) => void;
+  private onMouseUp?:   (e: MouseEvent) => void;
+
   private BASE  = 0;
   private scale = 0;
   private autoRot = true;
@@ -198,7 +210,12 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   ngOnChanges(c: SimpleChanges): void {
     if ((c['aqiData'] || c['viewMode']) && this.ready) this.dirty = true;
   }
-  ngOnDestroy(): void { this.stop?.(); cancelAnimationFrame(this.rafId); }
+  ngOnDestroy(): void { 
+    this.stop?.(); 
+    cancelAnimationFrame(this.rafId); 
+    if (this.onMouseMove) window.removeEventListener('mousemove', this.onMouseMove);
+    if (this.onMouseUp)   window.removeEventListener('mouseup',   this.onMouseUp);
+  }
 
   private build(): void {
     const canvas = this.canvasRef.nativeElement;
@@ -233,6 +250,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
         String(f.id) === String(INDIA_ID) ? { ...f, geometry: india.geometry } : f
       );
       this.worldFeatures = features;
+      this.precomputeNeighborClips(features);
       this.ready = true;
       this.dirty = true;
 
@@ -322,8 +340,10 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       this.checkIndiaZoom();
       setTimeout(() => { this.autoRot = true; }, 3000);
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup',   onUp);
+    this.onMouseMove = onMove;
+    this.onMouseUp   = onUp;
+    window.addEventListener('mousemove', this.onMouseMove);
+    window.addEventListener('mouseup',   this.onMouseUp);
 
     // Scroll
     canvas.addEventListener('wheel', (e: WheelEvent) => {
@@ -385,38 +405,26 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
         fill = baseCol + '44'; // Transparent version to show it's fallback
       }
 
-      // Punch-out logic for Neighbors to avoid overlap with India Official
-      const neighbors = ['156', '586', '50', '524', '64', '104', '4'];
-      if (neighbors.includes(String(feat.id)) && this.indiaGeometry) {
+      // Pre-processed neighbors avoid per-frame clipping overhead
+      if (this.neighborFeatures.has(String(feat.id))) {
         ctx.save();
         ctx.beginPath(); path(feat); ctx.clip();
-        
-        ctx.beginPath();
-        path(this.sphere);
+        ctx.beginPath(); path(this.sphere);
         path({ type: 'Feature', properties: {}, geometry: this.indiaGeometry });
         ctx.clip('evenodd'); 
-        
         ctx.fillStyle = fill;
         ctx.globalAlpha = (data && data.avgAqi != null) ? (isHov ? 1.0 : 0.82) : 0.85;
         ctx.fill();
-        
-        ctx.strokeStyle = isHov ? 'rgba(255,255,255,0.3)' : (hasData ? '#020510' : NO_DATA_STROKE);
-        ctx.lineWidth   = isHov ? 1.2 : 0.4;
-        ctx.stroke();
         ctx.restore();
         continue;
       }
 
-      // Default country drawing
       ctx.beginPath(); path(feat);
       ctx.fillStyle   = fill;
       ctx.globalAlpha = (data && data.avgAqi != null) ? (isHov ? 1.0 : 0.82) : 0.85;
       ctx.fill(); 
       ctx.globalAlpha = 1;
-
-      ctx.strokeStyle = isHov ? 'rgba(255,255,255,0.25)' : (hasData ? '#020510' : NO_DATA_STROKE);
-      ctx.lineWidth   = isHov ? 1.2 : (hasData ? 0.4 : 0.5);
-      ctx.stroke();
+      // Borders drawn in unified pass below
     }
 
     // Specialized India Drawing (Official Boundary + Glow)
@@ -432,14 +440,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       ctx.fillStyle = val != null ? info.col : NO_DATA_COLOR;
       ctx.globalAlpha = isHov ? 1.0 : 0.95;
       ctx.fill();
-      
-      // India Official Border (Matched to normal countries)
-      ctx.save();
-      ctx.strokeStyle = isHov ? 'rgba(255,255,255,0.3)' : '#020510';
-      ctx.lineWidth   = isHov ? 1.2 : 0.4;
-      ctx.globalAlpha = 1.0;
-      ctx.stroke();
-      ctx.restore();
+      // Borders drawn in unified pass below
     }
 
     // India states
@@ -456,8 +457,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
         const isHov = this.hoveredState === name;
         ctx.beginPath(); path(feat);
         ctx.fillStyle = fill; ctx.globalAlpha = isHov ? 1.0 : 0.95; ctx.fill(); ctx.globalAlpha = 1;
-        ctx.strokeStyle = isHov ? 'rgba(255,255,255,0.3)' : '#020510';
-        ctx.lineWidth   = isHov ? 1.2 : 0.5; ctx.stroke();
+        // Borders drawn in unified pass below
       }
       // State labels
       if (this.scale >= this.BASE * INDIA_ENTER_MULT * 0.9) {
@@ -540,6 +540,44 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       ctx.stroke(); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
     }
 
+    this.drawAllBorders();
+  }
+
+  private precomputeNeighborClips(features: any[]): void {
+    const neighbors = ['156', '586', '50', '524', '64', '104', '4'];
+    for (const feat of features) {
+      if (neighbors.includes(String(feat.id))) {
+        this.neighborFeatures.set(String(feat.id), feat);
+      }
+    }
+  }
+
+  private drawAllBorders(): void {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+
+    // World Countries
+    for (const feat of this.worldFeatures) {
+      ctx.beginPath(); this.path(feat);
+      const isHov = this.hoveredId === feat.id;
+      ctx.strokeStyle = isHov ? 'rgba(255,255,255,0.35)' : '#020510';
+      ctx.lineWidth   = isHov ? 1.2 : 0.4;
+      ctx.stroke();
+    }
+
+    // India States
+    if (this.indiaMode && this.indiaFeatures.length) {
+      for (const feat of this.indiaFeatures) {
+        ctx.beginPath(); this.path(feat);
+        const name = feat.properties?.shapeName || feat.properties?.name || '';
+        const isHov = this.hoveredState === name;
+        ctx.strokeStyle = isHov ? 'rgba(255,255,255,0.35)' : '#020510';
+        ctx.lineWidth   = isHov ? 1.2 : 0.45;
+        ctx.stroke();
+      }
+    }
   }
 
 
