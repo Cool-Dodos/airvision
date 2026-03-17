@@ -1,5 +1,6 @@
 const express = require('express');
 const router  = express.Router();
+const axios   = require('axios');
 const AqiSnapshot   = require('../models/AqiSnapshot');
 const { fetchSingleCountry, fetchMapBounds, fetchIndiaStates, COUNTRY_CITIES } = require('../services/waqi');
 const { getTrend, detectAnomalies, get30DayAverage } = require('../services/analytics');
@@ -131,6 +132,23 @@ router.get('/snapshot/:timestamp', async (req, res) => {
     res.json({ fetchedAt: snapshot.fetchedAt, countries, globalAvg });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET /api/aqi/boundaries/:iso2 — proxy for GeoBoundaries to avoid CORS
+router.get('/boundaries/:iso2', async (req, res) => {
+  const iso2 = req.params.iso2.toUpperCase();
+  try {
+    const { data: meta } = await axios.get(`https://www.geoboundaries.org/api/current/gbOpen/${iso2}/ADM0/`, { timeout: 8000 });
+    if (!meta || !meta.gjDownloadURL) return res.status(404).json({ error: 'Boundary metadata not found' });
+    
+    const { data: geojson } = await axios.get(meta.gjDownloadURL, { timeout: 15000 });
+    const feature = geojson.type === 'FeatureCollection' ? geojson.features[0] : geojson;
+    
+    res.json(feature);
+  } catch (err) {
+    console.error(`Boundary fetch failed for ${iso2}:`, err.message);
+    res.status(502).json({ error: `Failed to fetch boundary from upstream: ${err.message}` });
   }
 });
 

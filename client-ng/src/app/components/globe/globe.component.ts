@@ -68,11 +68,10 @@ async function fetchBoundary(iso2: string): Promise<any | null> {
   if (boundaryCache[iso2]) return boundaryCache[iso2];
   try {
     const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 10000);
-    const meta = await fetch(`https://www.geoboundaries.org/api/current/gbOpen/${iso2}/ADM0/`, { signal: controller.signal }).then(r => r.json());
-    const gj   = await fetch(meta.gjDownloadURL, { signal: controller.signal }).then(r => r.json());
+    const id = setTimeout(() => controller.abort(), 15000);
+    // Use our backend proxy to avoid CORS issues
+    const feat = await fetch(`/api/aqi/boundaries/${iso2}`, { signal: controller.signal }).then(r => r.json());
     clearTimeout(id);
-    const feat = gj.type === 'FeatureCollection' ? gj.features[0] : gj;
     boundaryCache[iso2] = feat;
     return feat;
   } catch { return null; }
