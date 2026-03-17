@@ -1,8 +1,20 @@
 <div *ngIf="countryCode" class="panel" [style.border-left]="'2px solid ' + (info?.col || '#0d2a4a')">
-  <span class="close" (click)="closePanel.emit()">✕</span>
-
-  <div class="sec-label">Selected Region</div>
+  <div class="panel-header">
+    <div class="header-actions">
+      <span class="share-btn" (click)="onShare()">SHARE</span>
+      <span class="close" (click)="closePanel.emit()">DISMISS</span>
+    </div>
+    <div class="sec-label">Selected Region</div>
+  </div>
   <div *ngIf="loading" class="loading">Loading...</div>
+  <div *ngIf="error && !loading" class="error-msg">
+    <div class="err-icon">!</div>
+    <div class="err-text">Detailed data unavailable. The monitoring provider may be rate-limiting requests. Please try again in a few minutes.</div>
+  </div>
+  <div *ngIf="detail?.error && !loading" class="error-msg">
+    <div class="err-icon">!</div>
+    <div class="err-text">{{ detail.error }}</div>
+  </div>
 
   <ng-container *ngIf="detail && info">
     <div class="country-name">{{ detail.countryName || detail.name }}</div>
@@ -12,12 +24,18 @@
     <div class="aqi-row">
       <div class="aqi-val" [style.color]="info.col">{{ aqiValue }}</div>
       <div *ngIf="trend" class="trend-block">
-        <div class="trend-arrow" [style.color]="trend.trend.color">{{ trend.trend.arrow }}</div>
+        <div class="trend-arrow" [style.color]="trend.trend.color">{{ trend.trend.arrow === '↑' ? 'UP' : trend.trend.arrow === '↓' ? 'DOWN' : '' }}</div>
         <div class="trend-label" [style.color]="trend.trend.color">{{ trend.trend.label }}</div>
       </div>
     </div>
     <div class="aqi-cat" [style.color]="info.col">{{ info.cat }}</div>
-    <div *ngIf="srcTag" class="src-tag">{{ srcTag.icon }} {{ srcTag.tag }}</div>
+    
+    <div class="written-summary">
+      <div class="summary-label">ANALYTICS SUMMARY</div>
+      <div class="summary-text">{{ writtenSummary }}</div>
+    </div>
+
+    <div *ngIf="srcTag" class="src-tag">{{ srcTag.tag }}</div>
 
     <!-- Sparkline + forecast -->
     <ng-container *ngIf="spark.length > 1">
@@ -52,6 +70,18 @@
     </div>
     <div *ngIf="mask.needed" class="mask-note">{{ mask.note }}</div>
 
+    <!-- Do's and Don'ts -->
+    <div class="dd-section">
+      <div class="dd-block" *ngIf="dosDonts.do.length">
+        <div class="dd-title do">What to do</div>
+        <ul><li *ngFor="let item of dosDonts.do">{{ item }}</li></ul>
+      </div>
+      <div class="dd-block" *ngIf="dosDonts.dont.length">
+        <div class="dd-title dont">What to avoid</div>
+        <ul><li *ngFor="let item of dosDonts.dont">{{ item }}</li></ul>
+      </div>
+    </div>
+
     <!-- Pollutants -->
     <hr class="divider"/>
     <div class="sec-label">Pollutant Readings</div>
@@ -76,8 +106,8 @@
 
     <div *ngIf="detail.baseline30" class="baseline">
       30-day avg: <span [style.color]="aqiColor(detail.baseline30)">{{ detail.baseline30 }}</span>
-      <span *ngIf="(aqiValue ?? 0) > detail.baseline30 * 1.5" class="above"> ↑ above normal</span>
-      <span *ngIf="(aqiValue ?? 0) < detail.baseline30 * 0.7" class="below"> ↓ better than usual</span>
+      <span *ngIf="(aqiValue ?? 0) > detail.baseline30 * 1.5" class="above"> above normal</span>
+      <span *ngIf="(aqiValue ?? 0) < detail.baseline30 * 0.7" class="below"> better than usual</span>
     </div>
   </ng-container>
 </div>

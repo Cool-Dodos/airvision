@@ -81,12 +81,57 @@ router.get('/stations', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+let cacheIndiaStates = null;
+let IndiaStatesCachedAt = null;
+
 // GET /api/aqi/india/states — state-level AQI for India drill-down
 router.get('/india/states', async (req, res) => {
   try {
+    const now = Date.now();
+    const TTL = 30 * 60 * 1000; // 30 minutes
+
+    if (cacheIndiaStates && IndiaStatesCachedAt && (now - IndiaStatesCachedAt < TTL)) {
+      return res.json({ ok: true, count: Object.keys(cacheIndiaStates).length, states: cacheIndiaStates, source: 'cache' });
+    }
+
     const states = await fetchIndiaStates();
-    res.json({ ok: true, count: Object.keys(states).length, states });
+    cacheIndiaStates = states;
+    IndiaStatesCachedAt = now;
+    
+    res.json({ ok: true, count: Object.keys(states).length, states, source: 'live' });
   } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
+});
+
+// Get all global snapshots (last 12h)
+router.get('/snapshots', async (req, res) => {
+  try {
+    const snapshots = await AqiSnapshot.find({}, 'fetchedAt').sort({ fetchedAt: -1 });
+    // Map to timestamp for frontend compatibility if needed, or just change frontend
+    res.json(snapshots.map(s => ({ timestamp: s.fetchedAt })));
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch snapshots' });
+  }
+});
+
+// Get specific snapshot
+router.get('/snapshot/:timestamp', async (req, res) => {
+  try {
+    const ts = new Date(req.params.timestamp);
+    const snapshot = await AqiSnapshot.findOne({ fetchedAt: ts });
+    if (!snapshot) return res.status(404).json({ error: 'Snapshot not found' });
+    
+    // Map fetchedAt to timestamp for frontend and return countries
+    const countries = {};
+    let total = 0, count = 0;
+    for (const [code, data] of snapshot.countryAverages.entries()) {
+      countries[code] = data;
+      if (data.avgAqi != null) { total += data.avgAqi; count++; }
+    }
+    const globalAvg = count > 0 ? Math.round((total / count) * 10) / 10 : 0;
+    res.json({ fetchedAt: snapshot.fetchedAt, countries, globalAvg });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;

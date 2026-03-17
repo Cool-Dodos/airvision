@@ -7,7 +7,7 @@ export interface AqiInfo {
 
 export function aqiInfo(v: number | null | undefined): AqiInfo {
   if (v === null || v === undefined || isNaN(v as number)) {
-    return { cat: 'NO DATA', col: '#1a2a3a', textCol: '#4a6a8a', advice: 'No data available for this region.' };
+    return { cat: 'NO DATA', col: '#1e3050', textCol: '#4a6a8a', advice: 'No data available for this region.' };
   }
   if (v <= 50)  return { cat: 'GOOD',                        col: '#00e400', textCol: '#004400', advice: 'Air quality is satisfactory. Enjoy outdoor activities.' };
   if (v <= 100) return { cat: 'MODERATE',                    col: '#ffff00', textCol: '#444400', advice: 'Sensitive individuals should limit prolonged outdoor exertion.' };

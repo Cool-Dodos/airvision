@@ -1,8 +1,8 @@
-# 🚀 Launch Instructions - AirVision Global
+#  Launch Instructions - AirVision Global
 
 This guide provides a step-by-step walkthrough to get the **AirVision Global AQI Monitor** running on your local machine.
 
-## 📋 Prerequisites
+##  Prerequisites
 
 Before you begin, ensure you have the following installed:
 - **Node.js** (v18.x or v20.x recommended)
@@ -11,14 +11,14 @@ Before you begin, ensure you have the following installed:
 
 ---
 
-## 📂 Project Structure
+##  Project Structure
 
 - `/server`: Express.js backend (handles data fetching & MongoDB)
 - `/client-ng`: Angular frontend (handles the 3D globe & UI)
 
 ---
 
-## 🛠️ Step-by-Step Setup
+##  Step-by-Step Setup
 
 ### 1. Clone the Project
 ```bash
@@ -43,7 +43,7 @@ npm install
 
 ---
 
-## 🏃 Running the Application
+##  Running the Application
 
 ### Method A: Running Separately (Recommended)
 This is the most reliable way to monitor logs for both parts.
@@ -67,7 +67,7 @@ npm run dev
 
 ---
 
-## 🛸 Accessing the App
+##  Accessing the App
 
 Once the frontend terminal shows a successful compilation:
 1. Open your browser.
@@ -75,7 +75,7 @@ Once the frontend terminal shows a successful compilation:
 
 ---
 
-## 💡 Troubleshooting
+##  Troubleshooting
 
 - **Port Conflicts:** Ensure ports `5000` (Backend) and `4200` (Frontend) are not being used by other apps.
 - **Angular CLI:** If `ng` commands fail, use `npx ng` to use the local version within the project.

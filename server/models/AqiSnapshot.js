@@ -21,6 +21,16 @@ const AqiSnapshotSchema = new mongoose.Schema({
       minAqi: Number,
       stationCount: Number,
       dominentpol: String,
+      city: String,
+      time: String,
+      iaqi: new mongoose.Schema({
+        pm25: Number,
+        pm10: Number,
+        no2:  Number,
+        o3:   Number,
+        co:   Number,
+        so2:  Number,
+      }, { _id: false })
     }, { _id: false })
   }
 });

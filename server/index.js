@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
 const { startCronJob } = require('./services/cron');
 const aqiRoutes = require('./routes/aqi');
+const weatherRoutes = require('./routes/weather');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -41,7 +42,8 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error('MongoDB error:', err));
 
 app.use('/api/aqi', aqiRoutes);
+app.use('/api/weather', weatherRoutes);
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok', ts: new Date() }));
+app.get('/', (req, res) => res.json({ name: 'AirVision API', status: 'online' }));
 
 app.listen(PORT, () => console.log(`AirVision server running on port ${PORT}`));

@@ -1,18 +1,21 @@
-<canvas #starCanvas class="starfield"></canvas>
-<div class="scanlines"></div>
+<div class="app" [class.has-panel]="selectedCode || selectedState">
+  <canvas #starCanvas class="starfield"></canvas>
+  <div class="scanlines"></div>
 
 <div *ngIf="loading" class="loading-screen">
   <div class="loading-text">Initialising AirVision Global…</div>
 </div>
-<div *ngIf="error" class="error-banner">⚠ {{ error }}</div>
+<div *ngIf="error" class="error-banner"><span class="err-icon">ALERT</span> {{ error }}</div>
 
 <!-- Globe -->
 <app-globe
   [aqiData]="aqiData"
   [selectedCode]="selectedCode"
   [focusCountry]="focusCountry"
+  [viewMode]="viewMode"
   (countryClick)="onCountryClick($event)"
-  (stateClick)="onStateClick($event)">
+  (stateClick)="onStateClick($event)"
+  (indiaModeChange)="indiaMode = $event">
 </app-globe>
 
 <!-- Top-left brand -->
@@ -23,12 +26,36 @@
 </div>
 
 <!-- Top-right: global AQI + anomalies stacked below -->
-<div class="top-right">
+<div class="top-right" *ngIf="!selectedCode && !selectedState">
   <div class="gai-label">Global AQI Avg</div>
   <div class="gai-value" [style.color]="globalInfo.col">{{ globalAvg }}</div>
   <div class="gai-status" [style.color]="globalInfo.col">{{ globalInfo.cat }}</div>
   <div *ngIf="lastUpdated" class="gai-time">
     <span class="live-dot"></span>{{ lastUpdated | date:'HH:mm' }} UTC
+  </div>
+</div>
+
+<!-- Time Travel Slider -->
+<app-history-slider
+  [snapshots]="snapshots"
+  (timeSelect)="onTimeSelect($event)">
+</app-history-slider>
+
+<div class="social-links"></div>
+
+<!-- Layer Controls -->
+<div class="layer-controls">
+  <div class="ctrl-group">
+    <div class="selector-label">View Mode</div>
+    <select [(ngModel)]="viewMode" class="pollutant-select">
+      <option value="aqi">AQI Index</option>
+      <option value="pm25">PM2.5</option>
+      <option value="pm10">PM10</option>
+      <option value="no2">NO₂</option>
+      <option value="o3">O₃</option>
+      <option value="so2">SO₂</option>
+      <option value="co">CO</option>
+    </select>
   </div>
 </div>
 
@@ -42,13 +69,19 @@
 <app-info-panel
   *ngIf="selectedCode"
   [countryCode]="selectedCode"
-  (closePanel)="onClose()">
+  (closePanel)="onClose()"
+  (share)="setShareData($event)">
 </app-info-panel>
 
 <!-- State panel -->
 <div *ngIf="selectedState" class="state-panel" [style.border-left]="'2px solid ' + selectedState.col">
-  <span class="state-close" (click)="onClose()">✕</span>
-  <div class="state-sec">India — State View</div>
+  <div class="panel-header">
+    <div class="header-actions">
+      <span class="share-btn" (click)="onStateShare()">Share</span>
+      <span class="close" (click)="onClose()">Dismiss</span>
+    </div>
+    <div class="sec-label">Selected Region</div>
+  </div>
   <div class="state-name">{{ selectedState.name }}</div>
   <div class="state-aqi-row">
     <span class="state-aqi" [style.color]="selectedState.col">{{ selectedState.aqi ?? '—' }}</span>
@@ -73,12 +106,8 @@
     <span class="leg-swatch" [style.background]="l.col"></span>
     {{ l.label }}
   </div>
-  <div class="leg-note">
-    AQI values represent an average of multiple sensors across the region.
-  </div>
 </div>
 
-<div class="hint">Drag to rotate · Scroll to zoom · Click country for details</div>
 
 <!-- Ticker -->
 <div class="ticker">
@@ -87,3 +116,9 @@
     <div #tickerInner class="ticker-inner"></div>
   </div>
 </div>
+
+<app-share-card
+  *ngIf="shareData"
+  [data]="shareData"
+  (close)="shareData = null">
+</app-share-card>

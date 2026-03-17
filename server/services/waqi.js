@@ -213,7 +213,7 @@ const COUNTRY_CITIES = {
 async function fetchCityAQI(city) {
   try {
     const url = `${BASE}/feed/${encodeURIComponent(city)}/?token=${TOKEN()}`;
-    const { data } = await axios.get(url, { timeout: 8000 });
+    const { data } = await axios.get(url, { timeout: 5000 });
     if (data.status !== 'ok' || !data.data || data.data === 'Unknown station') return null;
     const d = data.data;
     const aqi = typeof d.aqi === 'number' ? d.aqi : parseInt(d.aqi);
@@ -240,7 +240,7 @@ async function fetchCityAQI(city) {
 async function fetchGeoAQI(lat, lon) {
   try {
     const url = `${BASE}/feed/geo:${lat};${lon}/?token=${TOKEN()}`;
-    const { data } = await axios.get(url, { timeout: 8000 });
+    const { data } = await axios.get(url, { timeout: 5000 });
     if (data.status !== 'ok' || !data.data) return null;
     const d = data.data;
     const aqi = typeof d.aqi === 'number' ? d.aqi : parseInt(d.aqi);
@@ -267,7 +267,7 @@ async function searchAQI(query) {
   try {
     const { data } = await axios.get(
       `${BASE}/search/?keyword=${encodeURIComponent(query)}&token=${TOKEN()}`,
-      { timeout: 8000 }
+      { timeout: 5000 }
     );
     if (data.status !== 'ok' || !data.data?.length) return null;
     const station = data.data.find(s => {
@@ -332,7 +332,7 @@ async function fetchAllCountries() {
     }));
     // Small delay between batches to respect rate limits
     if (i + BATCH < codes.length) {
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 500));
     }
   }
 
@@ -413,26 +413,29 @@ const INDIA_STATES = {
 async function fetchIndiaStates() {
   const results = {};
   const entries = Object.entries(INDIA_STATES);
+  const BATCH = 5;
 
-  // Fetch all states in parallel
-  await Promise.all(entries.map(async ([state, cfg]) => {
-    try {
-      let data = null;
-      // Try each city in the list until we find a working one
-      for (const city of cfg.cities) {
-        data = await fetchCityAQI(city);
-        if (data && data.aqi != null) break;
-      }
-      // If no city found, use GPS fallback
-      if (!data || data.aqi == null) {
-        data = await fetchGeoAQI(cfg.geo[0], cfg.geo[1]);
-      }
-      
-      if (data && data.aqi != null) {
-        results[state] = { aqi: data.aqi, city: data.city || cfg.cities[0] };
-      }
-    } catch { /* skip this state */ }
-  }));
+  for (let i = 0; i < entries.length; i += BATCH) {
+    const batch = entries.slice(i, i + BATCH);
+    await Promise.all(batch.map(async ([state, cfg]) => {
+      try {
+        let data = null;
+        for (const city of cfg.cities) {
+          data = await fetchCityAQI(city);
+          if (data && data.aqi != null) break;
+        }
+        if (!data || data.aqi == null) {
+          data = await fetchGeoAQI(cfg.geo[0], cfg.geo[1]);
+        }
+        if (data && data.aqi != null) {
+          results[state] = { aqi: data.aqi, city: data.city || cfg.cities[0] };
+        }
+      } catch { /* skip */ }
+    }));
+    if (i + BATCH < entries.length) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
 
   console.log(`[WAQI] India states: ${Object.keys(results).length}/${entries.length} fetched`);
   return results;
