@@ -172,9 +172,12 @@ body, .app {
 }
 .share-btn:hover { color: #8ba4c8; }
 
-app-info-panel {
-  display: none; pointer-events: none;
+app-info-panel, .state-panel {
+  display: none; 
+  pointer-events: none;
+  z-index: 100 !important;
 }
-app-info-panel.panel-visible {
-  display: block; pointer-events: auto;
+app-info-panel.panel-visible, .state-panel.panel-visible {
+  display: block; 
+  pointer-events: auto;
 }

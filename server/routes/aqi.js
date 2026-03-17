@@ -12,7 +12,9 @@ router.get('/world', async (req, res) => {
     const snapshot = await AqiSnapshot.findOne().sort({ fetchedAt: -1 });
     if (!snapshot) return res.status(503).json({ error: 'Data not ready yet, retry in 30s' });
     const countries = {};
-    for (const [code, data] of snapshot.countryAverages.entries()) countries[code] = data;
+    for (const [code, data] of snapshot.countryAverages.entries()) {
+      countries[code] = typeof data.toObject === 'function' ? data.toObject() : data;
+    }
     res.json({ fetchedAt: snapshot.fetchedAt, countries, count: snapshot.countryAverages.size });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -29,7 +31,14 @@ router.get('/country/:code', async (req, res) => {
     if (snapshot?.countryAverages.has(code)) {
       const cached = snapshot.countryAverages.get(code);
       const ageMin = (Date.now() - snapshot.fetchedAt) / 60000;
-      if (ageMin < 20) base = { source: 'cache', code, countryName: entry.name, ...cached };
+      if (ageMin < 20) {
+        base = { 
+          source: 'cache', 
+          code, 
+          countryName: entry.name, 
+          ...cached.toObject() 
+        };
+      }
     }
 
     // Live fetch if cache stale or missing
@@ -125,8 +134,9 @@ router.get('/snapshot/:timestamp', async (req, res) => {
     const countries = {};
     let total = 0, count = 0;
     for (const [code, data] of snapshot.countryAverages.entries()) {
-      countries[code] = data;
-      if (data.avgAqi != null) { total += data.avgAqi; count++; }
+      const plainData = typeof data.toObject === 'function' ? data.toObject() : data;
+      countries[code] = plainData;
+      if (plainData.avgAqi != null) { total += plainData.avgAqi; count++; }
     }
     const globalAvg = count > 0 ? Math.round((total / count) * 10) / 10 : 0;
     res.json({ fetchedAt: snapshot.fetchedAt, countries, globalAvg });
