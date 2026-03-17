@@ -11,15 +11,20 @@ const weatherRoutes = require('./routes/weather');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Security headers
-app.use(helmet());
+// Security headers — Relaxed for cross-domain SPA deployment
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false, // Disable CSP for simpler SPA/API split
+}));
 
-// CORS
+// CORS — Allow production Vercel and local dev
 app.use(cors({
   origin: [
     'https://airvision-seven.vercel.app',
+    'https://airvision.vercel.app',
     'http://localhost:4200'
-  ]
+  ],
+  credentials: true
 }));
 
 // Rate limiting — 100 requests per 15 min per IP

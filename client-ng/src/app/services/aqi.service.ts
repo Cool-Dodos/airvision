@@ -2,7 +2,10 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-const BASE = 'http://localhost:5000';
+// If on Vercel/Production, point to the Render backend. 
+// If on localhost, use empty string (proxy.conf.json handles it)
+const IS_PROD = !window.location.hostname.includes('localhost');
+const BASE = IS_PROD ? 'https://airvision-xcg9.onrender.com' : ''; 
 
 @Injectable({ providedIn: 'root' })
 export class AqiService {
