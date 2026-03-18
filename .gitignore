@@ -1,7 +1,36 @@
-node_modules/
-client/node_modules/
-server/node_modules/
-client/dist/
+# ─── SECRETS ────────────────────────────────────
 server/.env
+.env
+.env.*
+!.env.example
+
+# ─── SCRATCH / DEBUG SCRIPTS ─────────────────────
+inspect_db.js
+test_api.js
+test_waqi.js
+server/inspect_db_internal.js
+server/get_india_stations.js
+server/save_stations.js
+server/api_output.json
+server/india_stations_list.json
+
+# ─── INTERNAL DOCS (not for public repo) ─────────
+AirVision_QA_Report.md
+deep_analysis.md
+
+# ─── DEPENDENCIES ────────────────────────────────
+node_modules/
+server/node_modules/
+client/node_modules/
+client-ng/node_modules/
+
+# ─── BUILD OUTPUTS ────────────────────────────────
+client/dist/
+client/build/
+client-ng/dist/
+client-ng/.angular/
+
+# ─── OS & EDITOR JUNK ────────────────────────────
 .DS_Store
+Thumbs.db
 *.log
