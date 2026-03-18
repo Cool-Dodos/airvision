@@ -14,6 +14,10 @@ server/save_stations.js
 server/api_output.json
 server/india_stations_list.json
 
+# ─── INTERNAL DOCS (not for public repo) ────────
+AirVision_QA_Report.md
+deep_analysis.md
+
 # ─── DEPENDENCIES ───────────────────────────────
 node_modules/
 server/node_modules/
