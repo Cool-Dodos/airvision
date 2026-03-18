@@ -17,19 +17,19 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
     directives: {
-      defaultSrc:  ["'self'"],
-      scriptSrc:   ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
-      styleSrc:    ["'self'", "'unsafe-inline'"],
-      imgSrc:      ["'self'", 'data:', 'blob:', 'cdn.jsdelivr.net'],
-      connectSrc:  [
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:', 'cdn.jsdelivr.net'],
+      connectSrc: [
         "'self'",
         'https://api.waqi.info',
         'https://www.geoboundaries.org',
         'https://api.open-meteo.com',
         'https://cdn.jsdelivr.net',
       ],
-      fontSrc:     ["'self'"],
-      objectSrc:   ["'none'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
     }
   }
 }));
@@ -38,10 +38,10 @@ app.use(helmet({
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : [
-      'https://airvision-seven.vercel.app',
-      'https://airvision.vercel.app',
-      'http://localhost:4200',
-    ];
+    'https://airvision-seven.vercel.app',
+    'https://airvision.vercel.app',
+    'http://localhost:4200',
+  ];
 
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 
@@ -54,16 +54,16 @@ const realIp = (req) =>
 // Progressive Slowdown (patch 3.3) — deters script kids without blocking humans
 const speedLimiter = slowDown({
   windowMs: 15 * 60 * 1000,
-  delayAfter: 50, // start slowing after 50 req
-  delayMs: (used) => (used - 50) * 100, // +100ms per req above 50
+  delayAfter: 100, // start slowing after 100 req
+  delayMs: (used) => (used - 100) * 100, // +100ms per req above 100
   keyGenerator: realIp,
 });
 app.use('/api/', speedLimiter);
 
-// Rate limiting (patch 3.1)
+// Rate limiting (patch 3.1) — relaxed to 1500 for heavy dashboard loads
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1500,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: realIp,

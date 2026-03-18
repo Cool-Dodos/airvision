@@ -34,18 +34,25 @@ export class HistorySliderComponent implements OnChanges {
     return this.snapshots[this.currentIndex] ?? null;
   }
 
-  get tickLabels(): string[] {
+  get tickLabels(): { label: string; index: number }[] {
     const n = this.snapshots.length;
     if (n < 2) return [];
-    // Derive relative labels from actual timestamps
+    // Only show ~12 labels to avoid crowding the UI (patch 6.1.5)
+    const step = Math.max(1, Math.floor(n / 10));
     const newest = new Date(this.snapshots[n - 1].timestamp).getTime();
-    return this.snapshots.map(s => {
+    const result = [];
+    for (let i = 0; i < n; i += step) {
+      const s = this.snapshots[i];
       const diffMin = Math.round((newest - new Date(s.timestamp).getTime()) / 60000);
-      if (diffMin === 0) return 'NOW';
-      const h = Math.floor(diffMin / 60);
-      const m = diffMin % 60;
-      return h > 0 ? (m === 0 ? `-${h}H` : `-${h}H${m}m`) : `-${m}m`;
-    });
+      let label = '';
+      if (diffMin === 0) label = 'NOW';
+      else {
+        const h = Math.floor(diffMin / 60);
+        label = h > 0 ? `-${h}H` : `-${diffMin}m`;
+      }
+      result.push({ label, index: i });
+    }
+    return result;
   }
 
   ngOnChanges(changes: SimpleChanges): void {

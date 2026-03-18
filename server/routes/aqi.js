@@ -175,17 +175,20 @@ router.get('/boundaries/:iso2', async (req, res) => {
   try {
     const { data: meta } = await axios.get(
       `https://www.geoboundaries.org/api/current/gbOpen/${iso2}/ADM0/`,
-      { timeout: 8000 }
-    );
-    if (!meta || !meta.gjDownloadURL) return res.status(404).json({ error: 'Boundary metadata not found' });
+      { timeout: 7000 }
+    ).catch(() => ({ data: null }));
 
-    const { data: geojson } = await axios.get(meta.gjDownloadURL, { timeout: 15000 });
+    if (!meta || !meta.gjDownloadURL) {
+      return res.status(404).json({ error: `Boundary metadata not found for ${iso2}` });
+    }
+
+    const { data: geojson } = await axios.get(meta.gjDownloadURL, { timeout: 12000 });
     const feature = geojson.type === 'FeatureCollection' ? geojson.features[0] : geojson;
 
     res.json(feature);
   } catch (err) {
-    console.error(`Boundary fetch failed for ${iso2}:`, err.message);
-    res.status(502).json({ error: `Failed to fetch boundary from upstream: ${err.message}` });
+    console.warn(`Boundary fetch failed for ${iso2}:`, err.message);
+    res.status(503).json({ error: 'Boundary service temporarily unavailable. Please try again.' });
   }
 });
 

@@ -128,7 +128,7 @@ async function loadIndiaStateAqi(): Promise<Record<string, any>> {
     <span class="tt-cat" [style.color]="tooltip.col">{{tooltip.cat}}</span>
   </div>
   <div *ngIf="tooltip.aqi!==null" class="tt-safe">Safe outdoors: <span>{{tooltip.safe}}</span></div>
-  <div *ngIf="tooltip.src" class="tt-src">{{tooltip.src.icon}} {{tooltip.src.tag}}</div>
+  <div *ngIf="tooltip.src" class="tt-src">{{tooltip.src.tag}}</div>
   <div *ngIf="tooltip.aqi===null" class="tt-nodata">No monitoring station data</div>
 </div>
 <div *ngIf="loadingBoundary" class="boundary-badge">Loading boundary...</div>
@@ -171,16 +171,18 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.windowWidth = w;
     this.W = w; this.H = h;
-    this.proj.translate([w / 2, h / 2]).scale(Math.min(w, h) / 2.1);
-    this.scale = this.proj.scale();
-    this.resizeStaticCanvas();
-    this.dirty = true;
+    if (this.proj) {
+      this.proj.translate([w / 2, h / 2]).scale(Math.min(w, h) / 2.1);
+      this.scale = this.proj.scale();
+      this.dirty = true;
+    }
   }
 
   /** Keyboard navigation for accessibility (arrow keys rotate, +/- zoom) */
   onKeydown(event: KeyboardEvent): void {
     const ROTATE_STEP = 5;
     const ZOOM_STEP   = 30;
+    if (!this.proj) return;
     const r = this.proj.rotate();
     switch (event.key) {
       case 'ArrowLeft':  this.proj.rotate([r[0] - ROTATE_STEP, r[1], r[2]]); this.dirty = true; break;
@@ -204,8 +206,6 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   @Input() viewMode: 'aqi' | 'pm25' | 'pm10' | 'o3' | 'no2' | 'so2' | 'co' = 'aqi';
 
   private ctx!: CanvasRenderingContext2D;
-  private staticCanvas!: HTMLCanvasElement;
-  private staticCtx!: CanvasRenderingContext2D;
   private W = 0; private H = 0;
   private proj!: d3.GeoProjection;
   private path!: d3.GeoPath;
@@ -262,11 +262,6 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     canvas.height = this.H * dpr;
     this.ctx = canvas.getContext('2d')!;
     this.ctx.scale(dpr, dpr);
- 
-    // Patch 5.1.1: Offscreen canvas for static sphere
-    this.staticCanvas = document.createElement('canvas');
-    this.staticCtx = this.staticCanvas.getContext('2d')!;
-    this.resizeStaticCanvas();
 
     this.BASE  = Math.min(this.W, this.H) * 0.42;
     this.scale = this.BASE;
@@ -444,31 +439,6 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     });
   }
 
-  private resizeStaticCanvas(): void {
-    if (!this.staticCanvas || !this.staticCtx) return;
-    const dpr = window.devicePixelRatio || 1;
-    this.staticCanvas.width = this.W * dpr;
-    this.staticCanvas.height = this.H * dpr;
-    this.staticCtx.scale(dpr, dpr);
-    this.drawStatic();
-  }
-
-  private drawStatic(): void {
-    if (!this.staticCtx) return;
-    const ctx = this.staticCtx;
-    ctx.clearRect(0, 0, this.W, this.H);
-    // Draw the static ocean sphere background
-    // Note: while graticule rotates, the sphere circle itself is static at a given scale/center
-    ctx.beginPath();
-    this.path.context(ctx)(this.sphere);
-    ctx.fillStyle = OCEAN_COLOR;
-    ctx.fill();
-    ctx.strokeStyle = SPHERE_STROKE;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    this.path.context(this.ctx); // Restore context
-  }
-
   private draw(): void {
     if (!this.ctx) return;
     const ctx  = this.ctx;
@@ -484,14 +454,10 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       return false;
     };
 
-    // Patch 5.1.1: Use offscreen canvas for sphere background
-    if (this.staticCanvas) {
-      ctx.drawImage(this.staticCanvas, 0, 0, this.W, this.H);
-    } else {
-      ctx.beginPath(); path(this.sphere);
-      ctx.fillStyle = OCEAN_COLOR; ctx.fill();
-      ctx.strokeStyle = SPHERE_STROKE; ctx.lineWidth = 1.5; ctx.stroke();
-    }
+    // Sphere
+    ctx.beginPath(); path(this.sphere);
+    ctx.fillStyle = OCEAN_COLOR; ctx.fill();
+    ctx.strokeStyle = SPHERE_STROKE; ctx.lineWidth = 1.5; ctx.stroke();
 
     // Graticule
     ctx.beginPath(); path(this.grat);

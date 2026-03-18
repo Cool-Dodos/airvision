@@ -1,14 +1,14 @@
 .af-btn {
-  position: fixed; top: 180px; right: var(--ctrl-right, 24px); left: auto; transform: none;
-  background: rgba(13, 30, 58, 0.4);
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px; padding: 6px 14px; cursor: pointer;
+  position: fixed; top: 182px; right: 24px; left: auto; transform: none;
+  width: 210px;
+  background: rgba(13, 30, 58, 0.6);
+  border: 1px solid rgba(139, 164, 200, 0.2);
+  border-radius: 4px; padding: 4px 12px; cursor: pointer;
   font-family: 'Courier New', monospace;
-  font-size: 10px; letter-spacing: 0.25em; color: #8ba4c8;
-  text-transform: uppercase; z-index: 50;
-  display: flex; align-items: center; gap: 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  font-size: 11px; letter-spacing: 0.1em; color: #b0c4d8;
+  text-transform: uppercase; z-index: 150;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
   transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .af-btn.critical { border-color: #ff0000; color: #ff4444; }

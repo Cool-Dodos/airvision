@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, SimpleChanges, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AqiService } from '../../services/aqi.service';
 import { forkJoin, of } from 'rxjs';
@@ -8,6 +8,7 @@ interface CountryDetail {
   avgAqi: number | null;
   dominentpol: string | null;
   countryName: string;
+  city?: string;
   stationCount?: number;
   trend?: any;
   baseline30?: number | null;
@@ -26,8 +27,11 @@ interface CountryDetail {
 })
 export class InfoPanelComponent implements OnChanges {
   @Input() countryCode: string | null = null;
+  @Output() share = new EventEmitter<any>();
 
   detail: CountryDetail | null = null;
+
+  setShareData(d: any) { if (d) this.share.emit(d); }
   history: { ts: string; aqi: number }[] = [];
   loading = false;
   error = false;
@@ -158,6 +162,46 @@ export class InfoPanelComponent implements OnChanges {
     if (aqi <= 200) return '#ff0000';
     if (aqi <= 300) return '#8f3f97';
     return '#7e0023';
+  }
+
+  get advisory() {
+    const a = this.detail?.avgAqi ?? 0;
+    if (a <= 50) return { 
+      adults: 'All day', sensitive: 'All day', children: 'All day', 
+      bestTime: 'Any time - air is clean', mask: 'Not needed', maskCol: '#00e400' 
+    };
+    if (a <= 100) return { 
+      adults: 'All day', sensitive: 'Limit prolonged', children: 'Limit prolonged', 
+      bestTime: 'Early morning', mask: 'Not needed', maskCol: '#00e400' 
+    };
+    if (a <= 150) return { 
+      adults: 'Limit prolonged', sensitive: 'Avoid outdoors', children: 'Avoid outdoors', 
+      bestTime: 'Late evening', mask: 'Recommended', maskCol: '#ffff00' 
+    };
+    if (a <= 200) return { 
+      adults: 'Avoid outdoors', sensitive: 'Stay indoors', children: 'Stay indoors', 
+      bestTime: 'Avoid outdoors', mask: 'Required', maskCol: '#ff7e00' 
+    };
+    return { 
+      adults: 'Stay indoors', sensitive: 'Stay indoors', children: 'Stay indoors', 
+      bestTime: 'Avoid outdoors', mask: 'Critical', maskCol: '#ff0000' 
+    };
+  }
+
+  get forecast() {
+    const a = this.detail?.avgAqi ?? 0;
+    return [
+      { h: '1h', val: Math.round(a * 0.85) },
+      { h: '3h', val: Math.round(a * 0.62) },
+      { h: '6h', val: Math.round(a * 0.27) }
+    ];
+  }
+
+  get whatToDo() {
+    const a = this.detail?.avgAqi ?? 0;
+    if (a <= 50) return ['Outdoor exercise', 'Ventilate home', 'Open windows'];
+    if (a <= 100) return ['Reduced intensity', 'Close windows', 'Air Purifier ON'];
+    return ['Avoid outdoors', 'Mask required', 'Air Purifier MAX'];
   }
 
   buildSparkline(history: { ts: string; aqi: number }[]): string {

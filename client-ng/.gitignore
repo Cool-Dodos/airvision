@@ -1,42 +1,33 @@
-# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+# ─── SECRETS ────────────────────────────────────
+server/.env
+.env
+.env.*
+!.env.example
 
-# Compiled output
-/dist
-/tmp
-/out-tsc
-/bazel-out
+# ─── SCRATCH / DEBUG SCRIPTS (no need to ship) ──
+inspect_db.js
+test_api.js
+test_waqi.js
+server/inspect_db_internal.js
+server/get_india_stations.js
+server/save_stations.js
+server/api_output.json
+server/india_stations_list.json
 
-# Node
-/node_modules
-npm-debug.log
-yarn-error.log
+# ─── DEPENDENCIES ───────────────────────────────
+node_modules/
+server/node_modules/
+client/node_modules/
+client-ng/node_modules/
 
-# IDEs and editors
-.idea/
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
+# ─── BUILD OUTPUTS ──────────────────────────────
+client/dist/
+client/build/
+client-ng/dist/
+client-ng/.angular/
 
-# Visual Studio Code
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-.history/*
 
-# Miscellaneous
-/.angular/cache
-.sass-cache/
-/connect.lock
-/coverage
-/libpeerconnection.log
-testem.log
-/typings
-
-# System files
+# ─── OS & EDITOR JUNK ───────────────────────────
 .DS_Store
 Thumbs.db
+*.log

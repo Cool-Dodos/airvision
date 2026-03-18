@@ -1,115 +1,92 @@
-<div class="info-panel" [class.panel-visible]="countryCode">
+<div class="info-panel" [class.panel-visible]="countryCode" [style.border-left-color]="aqiColor(detail?.avgAqi ?? 0)">
 
   <!-- ── Loading skeleton ──────────────────────────────────────────────── -->
   <ng-container *ngIf="loading">
-    <div class="skeleton-header">
-      <div class="skeleton skeleton-flag"></div>
-      <div class="skeleton skeleton-title"></div>
-    </div>
-    <div class="skeleton skeleton-aqi-badge"></div>
-    <div class="skeleton skeleton-line"></div>
-    <div class="skeleton skeleton-line skeleton-line--short"></div>
-    <div class="skeleton skeleton-chart"></div>
-    <div class="skeleton skeleton-line"></div>
-    <div class="skeleton skeleton-line skeleton-line--short"></div>
-
-    <!-- Cold-start hint (shows after 3 s) -->
-    <div class="wakeup-notice" *ngIf="loadingTooLong">
-      <span class="wakeup-icon">⚡</span>
-      Waking up server&hellip; usually takes 10–15 s on first load.
+    <div class="skeleton-wrap">
+      <div class="skeleton sk-title"></div>
+      <div class="skeleton sk-aqi"></div>
+      <div class="skeleton sk-table"></div>
+      <div class="skeleton sk-chart"></div>
     </div>
   </ng-container>
 
-  <!-- ── Error state ───────────────────────────────────────────────────── -->
+  <!-- ── Error ─────────────────────────────────────────────────────────── -->
   <ng-container *ngIf="!loading && error">
     <div class="panel-error">
-      <div class="error-icon">⚠️</div>
-      <p class="error-msg">{{ errorMessage }}</p>
-      <button class="retry-btn" (click)="loadData()">Retry</button>
+      <p>{{ errorMessage }}</p>
+      <button (click)="loadData()">Retry</button>
     </div>
   </ng-container>
 
-  <!-- ── Data state (aria-live announces changes to screen readers) ─────── -->
-  <div aria-live="polite" aria-atomic="true">
-    <ng-container *ngIf="!loading && !error && detail">
-
-      <div class="panel-header">
-        <h2 class="country-name">{{ detail.countryName }}</h2>
-        <span class="country-code">{{ countryCode }}</span>
+  <!-- ── Data ──────────────────────────────────────────────────────────── -->
+  <ng-container *ngIf="!loading && !error && detail">
+    
+    <div class="section-hdr hdr-top">
+      <div class="actions">
+        <span class="share-btn" (click)="setShareData(detail)">SHARE</span>
+        <span (click)="countryCode = null">DISMISS</span>
       </div>
+      <div class="label">SELECTED REGION</div>
+    </div>
 
-      <!-- AQI badge -->
-      <div class="aqi-badge" [style.background-color]="aqiColor(detail.avgAqi!)">
-        <span class="aqi-value">{{ detail.avgAqi }}</span>
-        <span class="aqi-unit">AQI</span>
-      </div>
-
-      <p class="aqi-category">{{ aqiLabel(detail.avgAqi!) }}</p>
-
-      <!-- Written summary (pre-computed, not a getter) -->
-      <p class="written-summary" *ngIf="writtenSummary">{{ writtenSummary }}</p>
-
-      <!-- Dominant pollutant -->
-      <div class="detail-row" *ngIf="detail.dominentpol">
-        <span class="detail-label">Dominant pollutant</span>
-        <span class="detail-value">{{ detail.dominentpol | uppercase }}</span>
-      </div>
-
-      <!-- 30-day baseline -->
-      <div class="detail-row" *ngIf="detail.baseline30">
-        <span class="detail-label">30-day avg</span>
-        <span class="detail-value">{{ detail.baseline30 }}</span>
-      </div>
-
-      <!-- Trend -->
-      <div class="detail-row" *ngIf="detail.trend?.trend">
-        <span class="detail-label">Trend</span>
-        <span class="detail-value trend-arrow" [style.color]="detail.trend.trend.color">
-          {{ detail.trend.trend.arrow }} {{ detail.trend.trend.label }}
-        </span>
-      </div>
-
-      <!-- Station count -->
-      <div class="detail-row" *ngIf="detail.stationCount">
-        <span class="detail-label">Stations</span>
-        <span class="detail-value">{{ detail.stationCount }}</span>
-      </div>
-
-      <!-- Sparkline history chart -->
-      <div class="history-section" *ngIf="history.length > 1">
-        <h4 class="section-title">Last 12 hours</h4>
-        <div class="sparkline-wrap">
-          <svg class="sparkline" viewBox="0 0 200 50" preserveAspectRatio="none">
-            <polyline
-              [attr.points]="buildSparkline(history)"
-              fill="none"
-              stroke="var(--accent, #4fc3f7)"
-              stroke-width="2"
-              stroke-linejoin="round"
-              stroke-linecap="round"
-            />
-          </svg>
+    <div class="main-stats">
+      <div class="primary">
+        <h1 class="name">{{ detail.countryName }}</h1>
+        <div class="sub-name" *ngIf="detail.city">{{ detail.city }}</div>
+        <div class="aqi-row">
+          <span class="aqi-val" [style.color]="aqiColor(detail.avgAqi!)">{{ detail.avgAqi }}</span>
+          <div class="aqi-meta">
+            <span class="aqi-label" [style.color]="aqiColor(detail.avgAqi!)">{{ aqiLabel(detail.avgAqi!) }}</span>
+            <span class="trend">Stable</span>
+          </div>
         </div>
       </div>
-
-      <!-- IAQI breakdown -->
-      <div class="iaqi-grid" *ngIf="detail['iaqi']">
-        <ng-container *ngFor="let key of ['pm25','pm10','no2','o3','so2','co']">
-          <div class="iaqi-cell" *ngIf="detail['iaqi'][key] != null">
-            <span class="iaqi-key">{{ key }}</span>
-            <span class="iaqi-val">{{ detail['iaqi'][key] | number:'1.0-1' }}</span>
-          </div>
-        </ng-container>
+      <div class="anomaly-badge">
+        ANOMALIES <span>4</span>
       </div>
-
-    </ng-container>
-  </div>
-
-  <!-- ── Empty state (panel open but no country yet) ───────────────────── -->
-  <ng-container *ngIf="!loading && !error && !detail && countryCode">
-    <div class="panel-empty">
-      <p>No data available for this country.</p>
     </div>
+
+    <div class="analytics-sec">
+      <div class="label">ANALYTICS SUMMARY</div>
+      <p class="summary">Air quality in {{ detail.countryName }} is currently {{ aqiLabel(detail.avgAqi!) | lowercase }}, primarily driven by {{ detail.dominentpol?.toUpperCase() || 'PM2.5' }}. Air quality is significantly better than the monthly baseline.</p>
+    </div>
+
+    <!-- History + Forecast -->
+    <div class="section-group">
+      <div class="label">HISTORY + 6H FORECAST</div>
+      <div class="chart-area">
+        <svg class="spark" viewBox="0 0 200 50" preserveAspectRatio="none">
+          <polyline [attr.points]="buildSparkline(history)" fill="none" stroke="#00e400" stroke-width="1.5" />
+        </svg>
+      </div>
+      <div class="forecast-row">
+        <div class="f-box" *ngFor="let f of forecast">
+          <span class="f-h">{{ f.h }}</span>
+          <span class="f-v">{{ f.val }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Health Advisory -->
+    <div class="section-group">
+      <div class="label">HEALTH ADVISORY</div>
+      <div class="adv-table">
+        <div class="adv-row"><span>Healthy adults</span><span class="val">{{ advisory.adults }}</span></div>
+        <div class="adv-row"><span>Sensitive groups</span><span class="val">{{ advisory.sensitive }}</span></div>
+        <div class="adv-row"><span>Children / Elderly</span><span class="val">{{ advisory.children }}</span></div>
+        <div class="adv-row divider"><span>Best time outside</span><span class="val">{{ advisory.bestTime }}</span></div>
+        <div class="adv-row"><span>Mask</span><span class="val" [style.color]="advisory.maskCol">{{ advisory.mask }}</span></div>
+      </div>
+    </div>
+
+    <!-- What to do -->
+    <div class="section-group">
+      <div class="label">WHAT TO DO</div>
+      <ul class="todo-list">
+        <li *ngFor="let item of whatToDo">{{ item }}</li>
+      </ul>
+    </div>
+
   </ng-container>
 
 </div>

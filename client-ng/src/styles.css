@@ -1,255 +1,133 @@
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-body, .app {
-  background: #020510;
-  font-family: 'Courier New', Courier, monospace;
-  color: #8ba4c8;
+/* Global resets and layouts */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body, html { 
+  overflow: hidden; 
+  background: #020510; 
+  color: #fff; 
+  font-family: 'Courier New', monospace;
+  height: 100%; width: 100%;
+}
+.app {
+  width: 100vw; height: 100vh;
+  position: relative;
   overflow: hidden;
-  width: 100vw;
-  height: 100vh;
-}
-:root {
-  --ctrl-right: 24px;
-}
-.app.has-panel {
-  --ctrl-right: 310px;
 }
 
-.starfield {
-  position: fixed; top: 0; left: 0; z-index: 0; pointer-events: none;
-}
+/* ═══════════════════════════════════════════════════════════════
+   UNIFIED RIGHT RAIL — Option A
+   All controls pinned to right: 24px, max-width: 210px
+   Stack top to bottom with 12px gaps, no visible dividers
+═══════════════════════════════════════════════════════════════ */
 
-.scanlines {
-  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px);
-  pointer-events: none; z-index: 5;
+/* 1 ─ Global AQI readout  (top: 30px → ends ≈ 170px) */
+.top-right {
+  position: fixed; top: 30px; right: 24px; z-index: 20;
+  width: 210px;
+  text-align: right;
+  font-family: 'Courier New', monospace;
 }
+.gai-label  { font-size: 11px; letter-spacing: 0.2em; color: #b0c4d8; text-transform: uppercase; margin-bottom: 4px; }
+.gai-value  { font-size: 52px; font-weight: bold; line-height: 0.88; margin-bottom: 4px; }
+.gai-status { font-size: 13px; font-weight: bold; letter-spacing: 0.12em; text-transform: uppercase; }
+.gai-time   { font-size: 11px; color: #7a9ab8; margin-top: 5px; display:flex; align-items:center; justify-content:flex-end; gap:5px; }
+.live-dot   { width:6px; height:6px; border-radius:50%; background:#00e400; display:inline-block; box-shadow:0 0 6px #00e400; }
 
-.loading-screen {
-  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  z-index: 100; text-align: center;
-}
-.loading-text {
-  font-size: 11px; letter-spacing: 0.4em; color: #2a4a6a; text-transform: uppercase;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-@keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+/* 2 ─ Anomaly button: 12px below AQI block (≈ top: 182px) */
+/*     Controlled in anomaly-feed.component.css — see that file */
 
-.error-banner {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  background: rgba(127,0,35,0.8); color: #ffd0d8;
-  font-size: 11px; letter-spacing: 0.2em; padding: 8px; text-align: center;
-}
-
-/* Header */
-.header { position: fixed; top: 22px; left: 24px; z-index: 20; user-select: none; }
-.brand-label { font-size: 10px; letter-spacing: 0.4em; color: #3a5a7a; text-transform: uppercase; margin-bottom: 3px; }
-.brand-title { font-size: 26px; letter-spacing: 0.14em; color: #d8e8ff; font-weight: bold; line-height: 1.1; text-transform: uppercase; }
-.brand-sub { font-size: 11px; letter-spacing: 0.3em; color: #3a5a7a; margin-top: 4px; }
-
-/* Top right */
-.top-right { 
-  position: fixed; top: 22px; right: var(--ctrl-right, 24px); z-index: 20; 
-  text-align: right; user-select: none; 
-  transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.gai-label { font-size: 10px; letter-spacing: 0.28em; color: #3a6080; text-transform: uppercase; }
-.gai-value { font-size: 54px; font-weight: bold; line-height: 1; letter-spacing: 0.05em; filter: drop-shadow(0 0 15px rgba(0,0,0,0.8)); text-shadow: 0 0 20px rgba(2,5,16,1); }
-.gai-status { font-size: 12px; letter-spacing: 0.22em; margin-top: 3px; text-shadow: 0 0 10px rgba(2,5,16,1); }
-.gai-time { font-size: 10px; color: #2a4a6a; margin-top: 4px; letter-spacing: 0.1em; }
-.live-dot {
-  display: inline-block; width: 7px; height: 7px;
-  background: #00b894; border-radius: 50%; margin-right: 6px;
-  box-shadow: 0 0 8px #00b894;
-  animation: blink 1.4s ease-in-out infinite;
-}
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-
-/* Legend */
-.legend { position: fixed; bottom: 52px; left: 24px; z-index: 20; user-select: none; }
-.leg-title { font-size: 10px; letter-spacing: 0.32em; color: #3a6080; text-transform: uppercase; margin-bottom: 10px; }
-.leg-item { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: 12px; letter-spacing: 0.1em; color: #7a9ab8; }
-.leg-swatch { width: 28px; height: 6px; border-radius: 2px; flex-shrink: 0; }
-
-/* Hint */
-.hint {
-  position: fixed; bottom: 52px; left: 50%; transform: translateX(-50%);
-  font-size: 11px; letter-spacing: 0.18em; color: #2a4a6a; z-index: 20;
-  text-align: center; pointer-events: none; text-transform: uppercase;
-}
-
-/* Ticker */
-.ticker {
-  position: fixed; bottom: 0; left: 0; right: 0; height: 38px;
-  background: rgba(2,5,16,0.92); border-top: 1px solid #0d2a4a;
-  display: flex; align-items: center; overflow: hidden; z-index: 20;
-}
-.ticker-label {
-  flex-shrink: 0; padding: 0 16px; font-size: 10px; letter-spacing: 0.28em;
-  color: #2a4a6a; border-right: 1px solid #0d2a4a; text-transform: uppercase; white-space: nowrap;
-}
-.ticker-track { overflow: hidden; flex: 1; height: 100%; display: flex; align-items: center; }
-.ticker-inner {
-  white-space: nowrap; animation: scrollticker 200s linear infinite;
-  font-size: 12px; letter-spacing: 0.12em; padding-left: 40px;
-}
-@keyframes scrollticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
-
-/* State panel */
-.state-panel {
-  position: fixed; right: 24px; top: 50%; transform: translateY(-50%);
-  width: 240px; background: rgba(2,5,16,0.95);
-  border: 1px solid #0d2a4a; border-radius: 2px;
-  padding: 20px 18px; z-index: 20;
-  font-family: 'Courier New', monospace; color: #8ba4c8;
-  display: none; pointer-events: none;
-}
-.state-panel.panel-visible {
-  display: block; pointer-events: auto;
-}
-.state-close { cursor: pointer; font-size: 13px; color: #2a4a6a; }
-.state-close:hover { color: #c8d8f0; }
-.panel-header { margin-bottom: 15px; }
-.header-actions { display: flex; justify-content: flex-end; align-items: center; gap: 15px; margin-bottom: 5px; }
-.state-sec { font-size: 9px; letter-spacing: 0.35em; color: #2a4a6a; text-transform: uppercase; margin-bottom: 8px; }
-.state-name { font-size: 16px; color: #c8d8f0; font-weight: bold; margin-bottom: 10px; letter-spacing: 0.06em; }
-.state-aqi-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
-.state-aqi { font-size: 52px; font-weight: bold; line-height: 1; }
-.state-cat { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; }
-.state-divider { border: none; border-top: 1px solid #0a1e38; margin: 14px 0; }
-.state-row { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 8px; color: #3a5a7a; }
-.state-val { color: #8ba4c8; }
-.state-advice { font-size: 10px; color: #3a5a7a; line-height: 1.7; margin-top: 8px; }
-.state-advice.warn { color: #ff7e00; }
-.state-nodata { font-size: 10px; color: #1a3a5a; margin-top: 8px; letter-spacing: 0.1em; font-style: italic; }
-
-/* Layer Controls */
+/* 3 ─ View Mode row — label + dropdown on ONE line */
 .layer-controls {
-  position: fixed; top: 235px; right: var(--ctrl-right, 24px); z-index: 50;
-  display: flex; flex-direction: column; gap: 12px; align-items: flex-end;
-  transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.selector-label {
-  font-size: 9px; color: #3a5a7a; padding: 4px 10px; font-family: 'Courier New', monospace;
-  text-transform: uppercase; letter-spacing: 0.12em;
+  position: fixed; top: 228px; right: 24px; z-index: 1500;
+  width: 210px;
+  display: flex; flex-direction: row; flex-wrap: nowrap;
+  align-items: center; justify-content: space-between; gap: 8px;
 }
 .ctrl-group {
-  display: flex; gap: 1px; 
-  background: rgba(13, 30, 58, 0.4); 
-  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1); 
-  padding: 4px; border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  display: flex; flex-direction: row; flex-wrap: nowrap;
+  align-items: center; justify-content: space-between;
+  width: 100%; gap: 8px;
 }
-.ctrl-group button {
-  background: transparent; border: none; color: #3a5a7a; padding: 4px 10px; font-family: 'Courier New', monospace;
-  font-size: 9px; text-transform: uppercase; cursor: pointer; letter-spacing: 0.12em;
-}
-.ctrl-group button.active {
-  background: #0d2a4a; color: #c8d8f0;
+.selector-label {
+  font-size: 10px; color: #b0c4d8; text-transform: uppercase;
+  letter-spacing: 0.12em; white-space: nowrap; flex-shrink: 0;
 }
 .pollutant-select {
-  background: #020510; border: none; color: #8ba4c8; font-family: 'Courier New', monospace;
-  font-size: 9px; padding: 4px 8px; outline: none; cursor: pointer; text-transform: uppercase; letter-spacing: 0.1em;
+  background: rgba(13, 30, 58, 0.85); border: 1px solid #1a3a5a;
+  color: #d8e8ff; font-family: 'Courier New'; font-size: 11px;
+  padding: 3px 6px; outline: none; flex: 1; min-width: 0;
 }
 
-/* Legend Note */
-.leg-note {
-  font-size: 9px;
-  color: #3a5a7a;
-  margin-top: 15px;
-  max-width: 170px;
-  line-height: 1.5;
-  letter-spacing: 0.05em;
-  font-style: italic;
-  opacity: 0.8;
+/* 4 ─ History Slider: 12px below view mode row (≈ top: 266px) */
+app-history-slider {
+  position: fixed;
+  top: 266px;
+  right: 24px;
+  width: 210px;
+  z-index: 1500;
+  display: block;
 }
-/* Shared Components */
-.share-btn { 
-  cursor: pointer; 
-  font-size: 10px; color: #3a5a7a; text-transform: uppercase; 
-  letter-spacing: 0.1em; transition: color 0.2s;
-}
-.share-btn:hover { color: #8ba4c8; }
 
+/* ─── Left-side header ────────────────────────────────────────── */
+.header      { position: fixed; top: 24px; left: 24px; z-index: 20; user-select: none; }
+.brand-label { font-size: 10px; letter-spacing: 0.4em; color: #3a5a7a; text-transform: uppercase; margin-bottom: 3px; }
+.brand-title { font-size: 26px; letter-spacing: 0.14em; color: #d8e8ff; font-weight: bold; line-height: 1.1; text-transform: uppercase; }
+.brand-sub   { font-size: 11px; letter-spacing: 0.3em; color: #3a5a7a; margin-top: 4px; }
+
+/* ─── Legend ─────────────────────────────────────────────────── */
+.legend {
+  position: fixed; bottom: 50px; left: 24px; z-index: 20;
+  padding: 14px; background: rgba(2, 5, 16, 0.85);
+  border: 1px solid rgba(139, 164, 200, 0.1); min-width: 160px;
+}
+.leg-title  { font-size: 9px; text-transform: uppercase; letter-spacing: 0.2em; color: #3a5a7a; margin-bottom: 10px; }
+.leg-item   { display: flex; align-items: center; gap: 8px; font-size: 10px; color: #8ba4c8; margin-bottom: 5px; }
+.leg-swatch { width: 10px; height: 10px; border-radius: 1px; }
+
+/* ─── Ticker ──────────────────────────────────────────────────── */
+.ticker {
+  position: fixed; bottom: 0; left: 0; width: 100%; height: 36px;
+  background: rgba(2, 5, 16, 0.98); border-top: 1px solid rgba(139, 164, 200, 0.07);
+  display: flex; align-items: center; z-index: 2000;
+}
+.ticker-label {
+  background: rgba(0, 228, 0, 0.08); color: #00e400; font-weight: 900; font-size: 9px;
+  padding: 0 14px; height: 100%; display: flex; align-items: center;
+  letter-spacing: 0.15em; border-right: 1px solid rgba(0, 228, 0, 0.12);
+  text-transform: uppercase; flex-shrink: 0;
+}
+.ticker-track { flex: 1; overflow: hidden; white-space: nowrap; }
+/* 480s = ~8 min per full scroll; font 13px for readability */
+.ticker-inner {
+  display: inline-block; padding-left: 100%;
+  animation: ticker 480s linear infinite;
+  font-size: 13px; color: #8ba4c8; letter-spacing: 0.06em;
+}
+
+/* ─── Info / State side panels ────────────────────────────────── */
 app-info-panel, .state-panel {
-  display: none; 
-  pointer-events: none;
-  z-index: 100 !important;
+  display: block; position: fixed;
+  right: 0; top: 0; bottom: 0;
+  width: 340px; height: 100vh;
+  z-index: 2500;
+  background: rgba(2, 5, 16, 0.99);
+  border-left: 1px solid #00e400;
+  padding: 20px 24px;
+  box-shadow: -10px 0 60px rgba(0,0,0,0.9);
+  overflow-y: auto;
+  pointer-events: none; opacity: 0;
+  transform: translateX(340px);
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 app-info-panel.panel-visible, .state-panel.panel-visible {
-  display: block; 
-  pointer-events: auto;
+  opacity: 1; transform: translateX(0); pointer-events: auto;
 }
 
-/* ── Ticker flash fix ─────────────────────────────────────────────────────── */
-.ticker-inner { visibility: hidden; }
-.ticker-inner.ready { visibility: visible; }
+/* ─── Scanlines ───────────────────────────────────────────────── */
+.scanlines {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.06) 50%);
+  background-size: 100% 3px; pointer-events: none; z-index: 5000; opacity: 0.3;
+}
 
-/* ── Loading skeleton ─────────────────────────────────────────────────────── */
-@keyframes shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position:  400px 0; }
-}
-.skeleton {
-  background: linear-gradient(90deg,rgba(255,255,255,0.05) 25%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.05) 75%);
-  background-size: 800px 100%;
-  animation: shimmer 1.4s infinite linear;
-  border-radius: 6px;
-  margin-bottom: 10px;
-}
-.skeleton-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-.skeleton-flag   { width: 36px; height: 24px; flex-shrink: 0; }
-.skeleton-title  { flex: 1; height: 22px; }
-.skeleton-aqi-badge { width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 14px; }
-.skeleton-line   { height: 14px; width: 100%; }
-.skeleton-line--short { width: 60%; }
-.skeleton-chart  { height: 50px; width: 100%; border-radius: 4px; }
-
-/* ── Cold-start wakeup notice ─────────────────────────────────────────────── */
-.wakeup-notice {
-  display: flex; align-items: center; gap: 8px;
-  margin-top: 16px; padding: 8px 12px;
-  background: rgba(255,200,50,0.12);
-  border: 1px solid rgba(255,200,50,0.3);
-  border-radius: 8px; color: #ffd54f;
-  font-size: 0.8rem; line-height: 1.4;
-}
-.wakeup-icon { font-size: 1rem; }
-
-/* ── Share card toast ─────────────────────────────────────────────────────── */
-.share-toast {
-  position: absolute; bottom: 16px; left: 50%;
-  transform: translateX(-50%) translateY(8px);
-  background: rgba(30,220,120,0.92); color: #fff;
-  padding: 8px 18px; border-radius: 20px;
-  font-size: 0.82rem; font-weight: 600;
-  white-space: nowrap; pointer-events: none;
-  opacity: 0; transition: opacity 0.22s ease, transform 0.22s ease; z-index: 10;
-}
-.share-toast--visible { opacity: 1; transform: translateX(-50%) translateY(0); }
-.share-toast--error   { background: rgba(220,60,60,0.92); }
-
-/* ── Info panel error state ───────────────────────────────────────────────── */
-.panel-error {
-  display: flex; flex-direction: column;
-  align-items: center; gap: 12px;
-  padding: 24px 0; text-align: center;
-}
-.error-icon { font-size: 2rem; }
-.error-msg  { color: rgba(255,255,255,0.7); font-size: 0.9rem; line-height: 1.5; }
-.retry-btn  {
-  padding: 7px 18px;
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 20px; color: #fff;
-  font-size: 0.85rem; cursor: pointer;
-  transition: background 0.2s;
-}
-.retry-btn:hover { background: rgba(255,255,255,0.2); }
-
-/* ── Accessibility: Globe canvas focus ring (2.3) ─────────────────────────── */
-canvas:focus-visible {
-  outline: 3px solid #4f46e5;
-  outline-offset: 3px;
-}
+@keyframes ticker { 0% { transform: translate3d(0,0,0); } 100% { transform: translate3d(-100%,0,0); } }
+@keyframes pulse  { 0%,100% { opacity:0.5; } 50% { opacity:1; } }
