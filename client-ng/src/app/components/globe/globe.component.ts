@@ -3,6 +3,7 @@ import {
   ElementRef, ViewChild, Input, Output, EventEmitter,
   ChangeDetectionStrategy, NgZone, AfterViewInit
 } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { AqiService } from '../../services/aqi.service';
 import * as d3 from 'd3';
@@ -109,7 +110,13 @@ async function loadIndiaStateAqi(): Promise<Record<string, any>> {
   standalone: true,
   imports: [CommonModule],
   template: `
-<canvas #canvasEl style="position:fixed;top:0;left:0;width:100%;height:calc(100% - 38px);z-index:1;cursor:crosshair"></canvas>
+<canvas #canvasEl
+  style="position:fixed;top:0;left:0;width:100%;height:calc(100% - 38px);z-index:1;cursor:crosshair"
+  role="img"
+  aria-label="Interactive world globe showing real-time air quality index by country"
+  tabindex="0"
+  (keydown)="onKeydown($event)"
+></canvas>
 
 <div *ngIf="tooltip" class="tooltip"
   [style.left.px]="tooltip.x > (windowWidth - 250) ? tooltip.x - 220 : tooltip.x + 14" 
@@ -154,9 +161,36 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
   @HostListener('window:resize')
   onResize() {
-    this.windowWidth = window.innerWidth;
-    this.proj.scale(this.scale).translate([this.windowWidth / 2, (window.innerHeight - 38) / 2]);
+    const canvas = this.canvasRef?.nativeElement;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w   = canvas.offsetWidth;
+    const h   = canvas.offsetHeight;
+    canvas.width  = w * dpr;
+    canvas.height = h * dpr;
+    this.ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.windowWidth = w;
+    this.W = w; this.H = h;
+    this.proj.translate([w / 2, h / 2]).scale(Math.min(w, h) / 2.1);
+    this.scale = this.proj.scale();
+    this.resizeStaticCanvas();
     this.dirty = true;
+  }
+
+  /** Keyboard navigation for accessibility (arrow keys rotate, +/- zoom) */
+  onKeydown(event: KeyboardEvent): void {
+    const ROTATE_STEP = 5;
+    const ZOOM_STEP   = 30;
+    const r = this.proj.rotate();
+    switch (event.key) {
+      case 'ArrowLeft':  this.proj.rotate([r[0] - ROTATE_STEP, r[1], r[2]]); this.dirty = true; break;
+      case 'ArrowRight': this.proj.rotate([r[0] + ROTATE_STEP, r[1], r[2]]); this.dirty = true; break;
+      case 'ArrowUp':    this.proj.rotate([r[0], Math.max(-90, r[1] - ROTATE_STEP), r[2]]); this.dirty = true; break;
+      case 'ArrowDown':  this.proj.rotate([r[0], Math.min(90,  r[1] + ROTATE_STEP), r[2]]); this.dirty = true; break;
+      case '+': case '=': { const s = this.proj.scale(); this.proj.scale(Math.min(800, s + ZOOM_STEP)); this.dirty = true; break; }
+      case '-':           { const s = this.proj.scale(); this.proj.scale(Math.max(100, s - ZOOM_STEP)); this.dirty = true; break; }
+    }
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)) event.preventDefault();
   }
   @Output() countryClick = new EventEmitter<string>();
   @Output() stateClick   = new EventEmitter<{ name: string; aqi: number | null; col: string; cat: string; safe: string }>();
@@ -170,6 +204,8 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   @Input() viewMode: 'aqi' | 'pm25' | 'pm10' | 'o3' | 'no2' | 'so2' | 'co' = 'aqi';
 
   private ctx!: CanvasRenderingContext2D;
+  private staticCanvas!: HTMLCanvasElement;
+  private staticCtx!: CanvasRenderingContext2D;
   private W = 0; private H = 0;
   private proj!: d3.GeoProjection;
   private path!: d3.GeoPath;
@@ -196,6 +232,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   private rafId   = 0;
   private stop?:  () => void;
   private dirty   = true;
+  private indiaStatesLoading = false; // Race condition lock for India mode
 
   readonly legNote = 'AQI values are representative of the average of multiple sensors across each region.';
 
@@ -225,6 +262,11 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     canvas.height = this.H * dpr;
     this.ctx = canvas.getContext('2d')!;
     this.ctx.scale(dpr, dpr);
+ 
+    // Patch 5.1.1: Offscreen canvas for static sphere
+    this.staticCanvas = document.createElement('canvas');
+    this.staticCtx = this.staticCanvas.getContext('2d')!;
+    this.resizeStaticCanvas();
 
     this.BASE  = Math.min(this.W, this.H) * 0.42;
     this.scale = this.BASE;
@@ -276,12 +318,13 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       if (this.indiaMode && this.indiaFeatures.length) {
         const state = this.indiaFeatures.find(f => d3.geoContains(f, geo));
         if (state) {
-          const name = state.properties?.shapeName || state.properties?.name || '';
-          const data = this.stateAqi[name];
+          const rawName = state.properties?.shapeName || state.properties?.name || '';
+          const normName = this.normalizeStateName(rawName);
+          const data = this.stateAqi[normName] || this.stateAqi[rawName];
           const info = aqiInfo(data?.aqi);
           const safe = safeOutdoorTime(data?.aqi ?? undefined);
           this.zone.run(() => {
-            this.stateClick.emit({ name, aqi: data?.aqi ?? null, col: info.col, cat: info.cat, safe: safe.healthy });
+            this.stateClick.emit({ name: rawName, aqi: data?.aqi ?? null, col: info.col, cat: info.cat, safe: safe.healthy });
           });
           return;
         }
@@ -352,6 +395,78 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       this.checkIndiaZoom();
       this.dirty = true;
     }, { passive: false });
+
+    // Touch — drag and pinch-to-zoom (patch 1.2)
+    let lastTouchX = 0, lastTouchY = 0, lastPinchDist = 0;
+    canvas.addEventListener('touchstart', (e: TouchEvent) => {
+      e.preventDefault();
+      this.autoRot = false;
+      if (e.touches.length === 1) {
+        lastTouchX = e.touches[0].clientX;
+        lastTouchY = e.touches[0].clientY;
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        lastPinchDist = Math.hypot(dx, dy);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length === 1) {
+        const dx = e.touches[0].clientX - lastTouchX;
+        const dy = e.touches[0].clientY - lastTouchY;
+        lastTouchX = e.touches[0].clientX;
+        lastTouchY = e.touches[0].clientY;
+        const r = this.proj.rotate();
+        this.proj.rotate([
+          r[0] + dx * 0.3,
+          Math.max(-90, Math.min(90, r[1] - dy * 0.3)),
+          r[2]
+        ]);
+        this.dirty = true;
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist  = Math.hypot(dx, dy);
+        const delta = dist - lastPinchDist;
+        lastPinchDist = dist;
+        const s = this.proj.scale();
+        this.proj.scale(Math.max(100, Math.min(this.BASE * 5, s + delta * 0.5)));
+        this.checkIndiaZoom();
+        this.dirty = true;
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => {
+      this.checkIndiaZoom();
+      setTimeout(() => { this.autoRot = true; }, 3000);
+    });
+  }
+
+  private resizeStaticCanvas(): void {
+    if (!this.staticCanvas || !this.staticCtx) return;
+    const dpr = window.devicePixelRatio || 1;
+    this.staticCanvas.width = this.W * dpr;
+    this.staticCanvas.height = this.H * dpr;
+    this.staticCtx.scale(dpr, dpr);
+    this.drawStatic();
+  }
+
+  private drawStatic(): void {
+    if (!this.staticCtx) return;
+    const ctx = this.staticCtx;
+    ctx.clearRect(0, 0, this.W, this.H);
+    // Draw the static ocean sphere background
+    // Note: while graticule rotates, the sphere circle itself is static at a given scale/center
+    ctx.beginPath();
+    this.path.context(ctx)(this.sphere);
+    ctx.fillStyle = OCEAN_COLOR;
+    ctx.fill();
+    ctx.strokeStyle = SPHERE_STROKE;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    this.path.context(this.ctx); // Restore context
   }
 
   private draw(): void {
@@ -369,10 +484,14 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       return false;
     };
 
-    // Sphere
-    ctx.beginPath(); path(this.sphere);
-    ctx.fillStyle = OCEAN_COLOR; ctx.fill();
-    ctx.strokeStyle = SPHERE_STROKE; ctx.lineWidth = 1.5; ctx.stroke();
+    // Patch 5.1.1: Use offscreen canvas for sphere background
+    if (this.staticCanvas) {
+      ctx.drawImage(this.staticCanvas, 0, 0, this.W, this.H);
+    } else {
+      ctx.beginPath(); path(this.sphere);
+      ctx.fillStyle = OCEAN_COLOR; ctx.fill();
+      ctx.strokeStyle = SPHERE_STROKE; ctx.lineWidth = 1.5; ctx.stroke();
+    }
 
     // Graticule
     ctx.beginPath(); path(this.grat);
@@ -594,13 +713,14 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     if (this.indiaMode && this.indiaFeatures.length) {
       const state = this.indiaFeatures.find(f => d3.geoContains(f, geo));
       if (state) {
-        const name = state.properties?.shapeName || state.properties?.name || '';
-        if (this.hoveredState !== name) {
-          this.hoveredState = name; this.hoveredId = null;
-          const data = this.stateAqi[name];
+        const rawName  = state.properties?.shapeName || state.properties?.name || '';
+        const normName = this.normalizeStateName(rawName);
+        if (this.hoveredState !== rawName) {
+          this.hoveredState = rawName; this.hoveredId = null;
+          const data = this.stateAqi[normName] || this.stateAqi[rawName];
           const info = aqiInfo(data?.aqi);
           const safe = safeOutdoorTime(data?.aqi ?? undefined);
-          this.zone.run(() => { this.tooltip = { x: clientX, y: clientY, name, aqi: data?.aqi ?? null, col: info.col, cat: info.cat, safe: safe.healthy }; });
+          this.zone.run(() => { this.tooltip = { x: clientX, y: clientY, name: rawName, aqi: data?.aqi ?? null, col: info.col, cat: info.cat, safe: safe.healthy }; });
           this.dirty = true;
         } else if (this.tooltip) {
           this.zone.run(() => { this.tooltip = { ...this.tooltip!, x: clientX, y: clientY }; });
@@ -647,26 +767,43 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     }
   }
 
-  private triggerIndiaMode(): void {
-    if (this.indiaMode) return;
-    this.indiaMode = true; this.dirty = true;
-    this.indiaModeChange.emit(true);
-    this.loadAndDrawStates();
+  private async triggerIndiaMode(): Promise<void> {
+    if (this.indiaMode || this.indiaStatesLoading) return;  // race-condition lock
+    this.indiaStatesLoading = true;
+    try {
+      this.indiaMode = true; this.dirty = true;
+      this.indiaModeChange.emit(true);
+      this.zone.run(() => { this.loadingBoundary = true; });
+      const [features, stateAqi] = await Promise.all([loadIndiaStatesGeo(), loadIndiaStateAqi()]);
+      this.zone.run(() => { this.loadingBoundary = false; });
+      if (!this.indiaMode) return;  // user exited while loading
+      this.indiaFeatures = features;
+      // Normalize the stateAqi keys so GeoJSON shapeName lookup always hits
+      const normalized: Record<string, any> = {};
+      for (const [k, v] of Object.entries(stateAqi)) {
+        normalized[this.normalizeStateName(k)] = v;
+      }
+      this.stateAqi = normalized;
+      this.dirty = true;
+    } finally {
+      this.indiaStatesLoading = false;
+    }
   }
 
   private exitIndiaMode(): void {
-    if (!this.indiaMode) return;
+    if (!this.indiaMode || this.indiaStatesLoading) return;  // block exit mid-fetch
     this.indiaMode = false; this.indiaFeatures = []; this.hoveredState = null; this.dirty = true;
     this.indiaModeChange.emit(false);
   }
 
-  private loadAndDrawStates(): void {
-    this.zone.run(() => { this.loadingBoundary = true; });
-    Promise.all([loadIndiaStatesGeo(), loadIndiaStateAqi()]).then(([features, stateAqi]) => {
-      this.zone.run(() => { this.loadingBoundary = false; });
-      if (!this.indiaMode) return;
-      this.indiaFeatures = features; this.stateAqi = stateAqi; this.dirty = true;
-    });
+  /** Normalize state names for consistent stateAqi lookups (handles mixed case, diacritics) */
+  private normalizeStateName(name: string): string {
+    if (!name) return '';
+    return name.toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   private loadHighlightBoundary(iso2: string, feat: any): void {

@@ -1,122 +1,92 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges } from '@angular/core';
+import {
+  Component, Input, Output, EventEmitter,
+  OnChanges, SimpleChanges, ChangeDetectionStrategy
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+
+export interface SnapshotEntry { timestamp: string; }
 
 @Component({
   selector: 'app-history-slider',
   standalone: true,
-  imports: [CommonModule, FormsModule],
-  template: `
-    <div class="history-container">
-      <div class="slider-header">
-        <span class="main-title">TIME TRAVEL</span>
-        <div class="actions">
-          <button class="live-btn" [class.active]="isLive" (click)="setLive()">LIVE</button>
-        </div>
-      </div>
-
-      <div class="slider-body">
-        <div class="time-label">{{ isLive ? 'REAL-TIME DATA' : (selectedTime | date:'HH:mm · dd MMM') }}</div>
-        <input 
-          type="range" 
-          [min]="0" 
-          [max]="maxIndex" 
-          [(ngModel)]="currentIndex" 
-          (input)="onSliderChange()"
-          class="time-slider"
-        />
-        <div class="ticks">
-          <span>-12H</span>
-          <span>-6H</span>
-          <span>NOW</span>
-        </div>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .history-container {
-      position: fixed; top: 310px; right: var(--ctrl-right, 24px);
-      width: 210px; background: rgba(13, 30, 58, 0.4); 
-      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 10px 14px; border-radius: 12px; z-index: 200;
-      font-family: 'Courier New', monospace;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-      transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    
-    .slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-    .main-title { font-size: 7px; font-weight: bold; letter-spacing: 0.3em; color: #4a6a8a; text-transform: uppercase; }
-    
-    .actions { display: flex; gap: 6px; }
-    .live-btn { 
-      background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); 
-      color: #8ba4c8; padding: 1px 6px; font-size: 8px; cursor: pointer; border-radius: 4px; 
-      text-transform: uppercase; transition: all 0.2s;
-    }
-    .live-btn.active { background: #00b894; color: #000; border-color: #00b894; font-weight: bold; }
-
-    .slider-body { margin-top: 4px; }
-    .time-label { font-size: 10px; color: #c8d8f0; font-weight: bold; margin-bottom: 8px; letter-spacing: 0.05em; }
-    
-    .time-slider {
-      width: 100%; cursor: pointer; height: 2px;
-      accent-color: #00b894; -webkit-appearance: none; background: rgba(255, 255, 255, 0.1); 
-      outline: none; margin: 4px 0; border-radius: 1px;
-    }
-    .time-slider::-webkit-slider-thumb { 
-      -webkit-appearance: none; width: 10px; height: 10px; background: #fff; border-radius: 50%; 
-      box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
-    }
-
-    .ticks { display: flex; justify-content: space-between; margin-top: 4px; font-size: 7px; color: #3a5a7a; letter-spacing: 0.1em; }
-  `]
+  imports: [CommonModule],
+  templateUrl: './history-slider.component.html',
+  styleUrls: ['./history-slider.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class HistorySliderComponent implements OnInit, OnChanges {
-  @Input() snapshots: any[] = [];
-  @Output() timeSelect = new EventEmitter<string | null>();
+export class HistorySliderComponent implements OnChanges {
+  @Input()  snapshots: SnapshotEntry[] = [];
+  @Output() snapshotChange = new EventEmitter<SnapshotEntry | null>();
 
+  /** Slider position: 0 = oldest, max = newest (latest/live) */
   currentIndex = 0;
-  maxIndex = 0;
-  collapsed = false;
-  isLive = true;
 
-  ngOnInit() {
-    this.updateMax();
+  /** The ISO timestamp the user has actively selected */
+  private pinnedTimestamp: string | null = null;
+
+  /** True when the slider is at the rightmost (live) position */
+  get isLive(): boolean {
+    return this.currentIndex === this.snapshots.length - 1;
   }
 
-  ngOnChanges() {
-    this.updateMax();
+  get selectedSnapshot(): SnapshotEntry | null {
+    if (!this.snapshots.length) return null;
+    return this.snapshots[this.currentIndex] ?? null;
   }
 
-  updateMax() {
-    this.maxIndex = this.snapshots?.length || 0;
-    if (this.isLive) this.currentIndex = this.maxIndex;
+  get tickLabels(): string[] {
+    const n = this.snapshots.length;
+    if (n < 2) return [];
+    // Derive relative labels from actual timestamps
+    const newest = new Date(this.snapshots[n - 1].timestamp).getTime();
+    return this.snapshots.map(s => {
+      const diffMin = Math.round((newest - new Date(s.timestamp).getTime()) / 60000);
+      if (diffMin === 0) return 'NOW';
+      const h = Math.floor(diffMin / 60);
+      const m = diffMin % 60;
+      return h > 0 ? (m === 0 ? `-${h}H` : `-${h}H${m}m`) : `-${m}m`;
+    });
   }
 
-  get selectedTime(): string | null {
-    const count = this.snapshots?.length || 0;
-    if (this.currentIndex >= count) return null;
-    // snapshots is [newest, ..., oldest]
-    // currentIndex 0 is leftmost (-12H), should be oldest (count-1)
-    // currentIndex count-1 is rightmost, should be newest (0)
-    return this.snapshots[count - 1 - this.currentIndex]?.timestamp || null;
-  }
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!changes['snapshots']) return;
+    const snaps = this.snapshots;
+    if (!snaps?.length) { this.currentIndex = 0; return; }
 
-  onSliderChange() {
-    const idx = Number(this.currentIndex);
-    if (idx >= this.maxIndex) {
-      this.isLive = true;
-      this.timeSelect.emit(null);
+    if (this.pinnedTimestamp === null) {
+      // First load or no active selection — jump to live (newest)
+      this.currentIndex = snaps.length - 1;
     } else {
-      this.isLive = false;
-      this.timeSelect.emit(this.selectedTime);
+      // New snapshots arrived: find the previously-selected timestamp
+      const idx = snaps.findIndex(s => s.timestamp === this.pinnedTimestamp);
+      if (idx !== -1) {
+        // Keep the same logical moment — index may shift if a new entry was prepended
+        this.currentIndex = idx;
+      } else {
+        // Pinned entry was pruned (>24h old) — stay at live
+        this.currentIndex = snaps.length - 1;
+        this.pinnedTimestamp = null;
+      }
     }
   }
 
-  setLive() {
-    this.isLive = true;
-    this.currentIndex = this.maxIndex;
-    this.timeSelect.emit(null);
+  onSliderInput(event: Event): void {
+    const val = +(event.target as HTMLInputElement).value;
+    this.currentIndex    = val;
+    const snap = this.snapshots[val] ?? null;
+    this.pinnedTimestamp = snap?.timestamp ?? null;
+    this.snapshotChange.emit(snap);
+  }
+
+  jumpToLive(): void {
+    this.currentIndex    = this.snapshots.length - 1;
+    this.pinnedTimestamp = null;
+    this.snapshotChange.emit(null); // null = "use live data"
+  }
+
+  formatLabel(ts: string): string {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 }

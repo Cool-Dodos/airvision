@@ -1,0 +1,44 @@
+<div class="share-overlay" (click)="close.emit()">
+  <div class="share-card" (click)="$event.stopPropagation()">
+
+    <button class="close-btn" (click)="close.emit()" aria-label="Close share card">✕</button>
+
+    <div class="share-header" *ngIf="data">
+      <div class="share-aqi-badge" [style.background-color]="data.col">
+        <span class="share-aqi-val">{{ data.aqi }}</span>
+        <span class="share-aqi-label">AQI</span>
+      </div>
+      <div class="share-meta">
+        <h3 class="share-country">{{ data.name }}</h3>
+        <p class="share-category">{{ data.cat }}</p>
+      </div>
+    </div>
+
+    <p class="share-preview">{{ shareText }}</p>
+
+    <div class="share-actions">
+      <button class="share-btn share-btn--copy" (click)="copyLink()" aria-label="Copy share link">
+        📋 Copy link
+      </button>
+      <button class="share-btn share-btn--native" (click)="shareNative()" *ngIf="true" aria-label="Share to other apps">
+        📤 Share
+      </button>
+      <button class="share-btn share-btn--twitter" (click)="shareTwitter()" aria-label="Share to Twitter">
+        𝕏 Twitter
+      </button>
+      <button class="share-btn share-btn--whatsapp" (click)="shareWhatsApp()" aria-label="Share to WhatsApp">
+        💬 WhatsApp
+      </button>
+    </div>
+
+    <!-- Toast — replaces the old alert() call -->
+    <div class="share-toast"
+         [class.share-toast--visible]="toastVisible"
+         [class.share-toast--error]="toastType === 'error'"
+         role="status"
+         aria-live="polite">
+      {{ toastMessage }}
+    </div>
+
+  </div>
+</div>

@@ -1,21 +1,35 @@
 const express = require('express');
 const router  = express.Router();
 const axios   = require('axios');
-const AqiSnapshot   = require('../models/AqiSnapshot');
+const rateLimit = require('express-rate-limit');
+const AqiSnapshot     = require('../models/AqiSnapshot');
+const StateSnapshot   = require('../models/StateSnapshot');
 const { fetchSingleCountry, fetchMapBounds, fetchIndiaStates, COUNTRY_CITIES } = require('../services/waqi');
 const { getTrend, detectAnomalies, get30DayAverage } = require('../services/analytics');
 const { getCachedAnomalies } = require('../services/cron');
 
+// Tighter limiter for expensive routes (patch 3.2)
+const realIp = (req) =>
+  (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) ?? req.headers['x-real-ip'] ?? req.ip;
+
+const expensiveLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  keyGenerator: realIp,
+  message: { error: 'Please wait before requesting this data again.' }
+});
+
 // GET /api/aqi/world — latest snapshot for all countries
 router.get('/world', async (req, res) => {
   try {
-    const snapshot = await AqiSnapshot.findOne().sort({ fetchedAt: -1 });
+    const snapshot = await AqiSnapshot.findOne().sort({ fetchedAt: -1 }).lean();
     if (!snapshot) return res.status(503).json({ error: 'Data not ready yet, retry in 30s' });
     const countries = {};
-    for (const [code, data] of snapshot.countryAverages.entries()) {
-      countries[code] = typeof data.toObject === 'function' ? data.toObject() : data;
+    for (const [code, data] of Object.entries(snapshot.countryAverages || {})) {
+      countries[code] = data;
     }
-    res.json({ fetchedAt: snapshot.fetchedAt, countries, count: snapshot.countryAverages.size });
+    res.set('Cache-Control', 'public, max-age=60');
+    res.json({ fetchedAt: snapshot.fetchedAt, countries, count: Object.keys(countries).length });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -25,23 +39,16 @@ router.get('/country/:code', async (req, res) => {
   const entry = COUNTRY_CITIES[code];
   if (!entry) return res.status(404).json({ error: 'Country not found' });
   try {
-    // Try cache first (< 20 min old)
-    const snapshot = await AqiSnapshot.findOne().sort({ fetchedAt: -1 });
+    const snapshot = await AqiSnapshot.findOne().sort({ fetchedAt: -1 }).lean();
     let base = null;
-    if (snapshot?.countryAverages.has(code)) {
-      const cached = snapshot.countryAverages.get(code);
-      const ageMin = (Date.now() - snapshot.fetchedAt) / 60000;
+    if (snapshot?.countryAverages?.[code]) {
+      const cached = snapshot.countryAverages[code];
+      const ageMin = (Date.now() - new Date(snapshot.fetchedAt)) / 60000;
       if (ageMin < 20) {
-        base = { 
-          source: 'cache', 
-          code, 
-          countryName: entry.name, 
-          ...cached.toObject() 
-        };
+        base = { source: 'cache', code, countryName: entry.name, ...cached };
       }
     }
 
-    // Live fetch if cache stale or missing
     if (!base) {
       const live = await fetchSingleCountry(code);
       if (!live) return res.status(503).json({ error: 'No station data available for this country' });
@@ -50,6 +57,7 @@ router.get('/country/:code', async (req, res) => {
 
     const trend      = await getTrend(code);
     const baseline30 = await get30DayAverage(code);
+    res.set('Cache-Control', 'public, max-age=300');
     res.json({ ...base, trend, baseline30 });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -58,24 +66,24 @@ router.get('/country/:code', async (req, res) => {
 router.get('/history/:code', async (req, res) => {
   const code = req.params.code.toUpperCase();
   try {
-    const snapshots = await AqiSnapshot.find().sort({ fetchedAt: -1 }).limit(48);
+    const snapshots = await AqiSnapshot.find().sort({ fetchedAt: -1 }).limit(48).lean();
     const history = snapshots
-      .filter(s => s.countryAverages.has(code))
-      .map(s => ({ ts: s.fetchedAt, aqi: s.countryAverages.get(code).avgAqi }))
+      .filter(s => s.countryAverages?.[code])
+      .map(s => ({ ts: s.fetchedAt, aqi: s.countryAverages[code].avgAqi }))
       .reverse();
+    res.set('Cache-Control', 'public, max-age=300');
     res.json({ code, history });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // GET /api/aqi/anomalies — countries 80%+ above 30-day baseline
-router.get('/anomalies', async (req, res) => {
+router.get('/anomalies', expensiveLimiter, async (req, res) => {
   try {
     const { anomalies, cachedAt } = getCachedAnomalies();
     if (!anomalies.length) {
-      const snapshot = await AqiSnapshot.findOne().sort({ fetchedAt: -1 });
+      const snapshot = await AqiSnapshot.findOne().sort({ fetchedAt: -1 }).lean();
       if (!snapshot) return res.json({ anomalies: [], cachedAt: null });
-      const plain = {};
-      for (const [code, val] of snapshot.countryAverages.entries()) plain[code] = val;
+      const plain = snapshot.countryAverages || {};
       const live = await detectAnomalies(plain);
       return res.json({ anomalies: live, cachedAt: new Date() });
     }
@@ -91,52 +99,62 @@ router.get('/stations', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-let cacheIndiaStates = null;
-let IndiaStatesCachedAt = null;
+// India states local cache removed for MongoDB-based StateSnapshot (patch 3.1.4)
 
 // GET /api/aqi/india/states — state-level AQI for India drill-down
-router.get('/india/states', async (req, res) => {
+router.get('/india/states', expensiveLimiter, async (req, res) => {
   try {
-    const now = Date.now();
-    const TTL = 30 * 60 * 1000; // 30 minutes
-
-    if (cacheIndiaStates && IndiaStatesCachedAt && (now - IndiaStatesCachedAt < TTL)) {
-      return res.json({ ok: true, count: Object.keys(cacheIndiaStates).length, states: cacheIndiaStates, source: 'cache' });
+    const TTL = 20 * 60 * 1000; // 20 minutes
+    const now = new Date();
+    
+    // Check MongoDB for latest snapshot
+    const latest = await StateSnapshot.findOne({ countryCode: 'IN' }).sort({ fetchedAt: -1 }).lean();
+    
+    if (latest && (now - latest.fetchedAt < TTL)) {
+      return res.json({ ok: true, count: Object.keys(latest.states).length, states: latest.states, source: 'cache_db' });
     }
 
+    // Fetch fresh if none found or expired
     const states = await fetchIndiaStates();
-    cacheIndiaStates = states;
-    IndiaStatesCachedAt = now;
-    
+    if (Object.keys(states).length > 0) {
+      await StateSnapshot.create({
+        countryCode: 'IN',
+        states: states,
+        fetchedAt: now
+      });
+    }
+
     res.json({ ok: true, count: Object.keys(states).length, states, source: 'live' });
   } catch (err) { res.status(500).json({ ok: false, error: err.message }); }
 });
 
-// Get all global snapshots (last 12h)
+// GET /api/aqi/snapshots — all snapshot timestamps (limited to last 48h / 96 entries)
 router.get('/snapshots', async (req, res) => {
   try {
-    const snapshots = await AqiSnapshot.find({}, 'fetchedAt').sort({ fetchedAt: -1 });
-    // Map to timestamp for frontend compatibility if needed, or just change frontend
+    const snapshots = await AqiSnapshot.find({}, 'fetchedAt')
+      .sort({ fetchedAt: -1 })
+      .limit(96) // Hard cap: 96 × 15min = 24h of history
+      .lean();
+    res.set('Cache-Control', 'public, max-age=60');
     res.json(snapshots.map(s => ({ timestamp: s.fetchedAt })));
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch snapshots' });
   }
 });
 
-// Get specific snapshot
+// GET /api/aqi/snapshot/:timestamp — single historical snapshot
 router.get('/snapshot/:timestamp', async (req, res) => {
   try {
     const ts = new Date(req.params.timestamp);
-    const snapshot = await AqiSnapshot.findOne({ fetchedAt: ts });
+    if (isNaN(ts.getTime())) return res.status(400).json({ error: 'Invalid timestamp' });
+
+    const snapshot = await AqiSnapshot.findOne({ fetchedAt: ts }).lean();
     if (!snapshot) return res.status(404).json({ error: 'Snapshot not found' });
-    
-    // Map fetchedAt to timestamp for frontend and return countries
-    const countries = {};
+
+    const countries = snapshot.countryAverages || {};
     let total = 0, count = 0;
-    for (const [code, data] of snapshot.countryAverages.entries()) {
-      const plainData = typeof data.toObject === 'function' ? data.toObject() : data;
-      countries[code] = plainData;
-      if (plainData.avgAqi != null) { total += plainData.avgAqi; count++; }
+    for (const data of Object.values(countries)) {
+      if (data.avgAqi != null) { total += data.avgAqi; count++; }
     }
     const globalAvg = count > 0 ? Math.round((total / count) * 10) / 10 : 0;
     res.json({ fetchedAt: snapshot.fetchedAt, countries, globalAvg });
@@ -145,21 +163,37 @@ router.get('/snapshot/:timestamp', async (req, res) => {
   }
 });
 
-// GET /api/aqi/boundaries/:iso2 — proxy for GeoBoundaries to avoid CORS
+// GET /api/aqi/boundaries/:iso2 — proxy for GeoBoundaries (with SSRF guard)
 router.get('/boundaries/:iso2', async (req, res) => {
   const iso2 = req.params.iso2.toUpperCase();
+
+  // SSRF guard: strictly validate to exactly 2 uppercase letters
+  if (!/^[A-Z]{2}$/.test(iso2)) {
+    return res.status(400).json({ error: 'Invalid country code. Must be a 2-letter ISO 3166-1 alpha-2 code.' });
+  }
+
   try {
-    const { data: meta } = await axios.get(`https://www.geoboundaries.org/api/current/gbOpen/${iso2}/ADM0/`, { timeout: 8000 });
+    const { data: meta } = await axios.get(
+      `https://www.geoboundaries.org/api/current/gbOpen/${iso2}/ADM0/`,
+      { timeout: 8000 }
+    );
     if (!meta || !meta.gjDownloadURL) return res.status(404).json({ error: 'Boundary metadata not found' });
-    
+
     const { data: geojson } = await axios.get(meta.gjDownloadURL, { timeout: 15000 });
     const feature = geojson.type === 'FeatureCollection' ? geojson.features[0] : geojson;
-    
+
     res.json(feature);
   } catch (err) {
     console.error(`Boundary fetch failed for ${iso2}:`, err.message);
     res.status(502).json({ error: `Failed to fetch boundary from upstream: ${err.message}` });
   }
+});
+
+// Honeypot — logs any automated scrapers that enumerate routes (patch 3.4)
+router.get('/global-stats-v2', (req, res) => {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] ?? req.ip;
+  console.warn('[HONEYPOT] Suspicious client:', ip, req.headers['user-agent']);
+  res.json({ count: 0, data: [] }); // Plausible empty response
 });
 
 module.exports = router;

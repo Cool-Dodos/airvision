@@ -74,15 +74,15 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   loadWorld(): void {
     if (this.isHistorical) return; // Do not load live data if in historical mode
 
-    this.aqi.getWorld().subscribe({
-      next: (json) => {
+    this.aqi.getWorldData().subscribe({
+      next: (json: any) => {
         if (json.error) { this.error = json.error; this.loading = false; return; }
         this.aqiData = json.countries || {};
         this.lastUpdated = new Date(json.fetchedAt);
         this.loading = false; this.error = null;
         setTimeout(() => this.updateTicker(), 100);
       },
-      error: (e) => { this.error = e.message; this.loading = false; }
+      error: (e: any) => { this.error = e.message || 'Failed to load world data'; this.loading = false; }
     });
   }
 
@@ -173,7 +173,8 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
-  onTimeSelect(ts: string | null): void {
+  onTimeSelect(snap: any): void {
+    const ts = snap?.timestamp;
     if (!ts) {
       this.isHistorical = false;
       this.loadWorld();

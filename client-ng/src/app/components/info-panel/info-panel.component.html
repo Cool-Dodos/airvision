@@ -1,113 +1,115 @@
-<div *ngIf="countryCode" class="panel" [style.border-left]="'2px solid ' + (info?.col || '#0d2a4a')">
-  <div class="panel-header">
-    <div class="header-actions">
-      <span class="share-btn" (click)="onShare()">SHARE</span>
-      <span class="close" (click)="closePanel.emit()">DISMISS</span>
+<div class="info-panel" [class.panel-visible]="countryCode">
+
+  <!-- ── Loading skeleton ──────────────────────────────────────────────── -->
+  <ng-container *ngIf="loading">
+    <div class="skeleton-header">
+      <div class="skeleton skeleton-flag"></div>
+      <div class="skeleton skeleton-title"></div>
     </div>
-    <div class="sec-label">Selected Region</div>
-  </div>
-  <div *ngIf="loading" class="loading">Loading...</div>
-  <div *ngIf="error && !loading" class="error-msg">
-    <div class="err-icon">!</div>
-    <div class="err-text">Detailed data unavailable. The monitoring provider may be rate-limiting requests. Please try again in a few minutes.</div>
-  </div>
-  <div *ngIf="detail?.error && !loading" class="error-msg">
-    <div class="err-icon">!</div>
-    <div class="err-text">{{ detail.error }}</div>
-  </div>
+    <div class="skeleton skeleton-aqi-badge"></div>
+    <div class="skeleton skeleton-line"></div>
+    <div class="skeleton skeleton-line skeleton-line--short"></div>
+    <div class="skeleton skeleton-chart"></div>
+    <div class="skeleton skeleton-line"></div>
+    <div class="skeleton skeleton-line skeleton-line--short"></div>
 
-  <ng-container *ngIf="detail && info">
-    <div class="country-name">{{ detail.countryName || detail.name }}</div>
-    <div *ngIf="detail.city" class="city">{{ detail.city }}</div>
-
-    <!-- AQI + trend -->
-    <div class="aqi-row">
-      <div class="aqi-val" [style.color]="info.col">{{ aqiValue }}</div>
-      <div *ngIf="trend" class="trend-block">
-        <div class="trend-arrow" [style.color]="trend.trend.color">{{ trend.trend.arrow === '↑' ? 'UP' : trend.trend.arrow === '↓' ? 'DOWN' : '' }}</div>
-        <div class="trend-label" [style.color]="trend.trend.color">{{ trend.trend.label }}</div>
-      </div>
-    </div>
-    <div class="aqi-cat" [style.color]="info.col">{{ info.cat }}</div>
-    
-    <div class="written-summary">
-      <div class="summary-label">ANALYTICS SUMMARY</div>
-      <div class="summary-text">{{ writtenSummary }}</div>
-    </div>
-
-    <div *ngIf="srcTag" class="src-tag">{{ srcTag.tag }}</div>
-
-    <!-- Sparkline + forecast -->
-    <ng-container *ngIf="spark.length > 1">
-      <hr class="divider"/>
-      <div class="sec-label">History + 6h Forecast</div>
-      <svg [attr.width]="SW" [attr.height]="SH" class="spark-svg">
-        <polyline [attr.points]="sparkPoints()" fill="none" [attr.stroke]="info.col" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        <polyline *ngIf="preds.length > 0" [attr.points]="forecastPoints()" fill="none" [attr.stroke]="info.col" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>
-        <line [attr.x1]="SW*0.65" y1="0" [attr.x2]="SW*0.65" [attr.y2]="SH" stroke="#0d2a4a" stroke-width="1" stroke-dasharray="2 2"/>
-        <text [attr.x]="SW*0.67" y="9" class="forecast-label">forecast →</text>
-      </svg>
-
-      <div *ngIf="trend" class="pred-row">
-        <div class="pred-box" *ngFor="let item of [['1h', trend.predictedIn1h], ['3h', trend.predictedIn3h], ['6h', trend.predictedIn6h]]">
-          <div class="pred-lbl">{{ item[0] }}</div>
-          <div class="pred-val" [style.color]="aqiColor(+item[1])">{{ item[1] }}</div>
-        </div>
-      </div>
-    </ng-container>
-
-    <!-- Health advisory -->
-    <hr class="divider"/>
-    <div class="sec-label">Health Advisory</div>
-    <div class="row"><span>Healthy adults</span><span class="val">{{ safeTime.healthy }}</span></div>
-    <div class="row"><span>Sensitive groups</span><span class="val">{{ safeTime.sensitive }}</span></div>
-    <div class="row"><span>Children / Elderly</span>
-      <span class="val" [style.color]="safeTime.children === 'Stay in' ? '#ff0000' : '#8ba4c8'">{{ safeTime.children }}</span>
-    </div>
-    <div class="row"><span>Best time outside</span><span class="val small">{{ bestHour }}</span></div>
-    <div class="row"><span>Mask</span>
-      <span class="val" [style.color]="mask.needed ? '#ff7e00' : '#00e400'">{{ mask.type }}</span>
-    </div>
-    <div *ngIf="mask.needed" class="mask-note">{{ mask.note }}</div>
-
-    <!-- Do's and Don'ts -->
-    <div class="dd-section">
-      <div class="dd-block" *ngIf="dosDonts.do.length">
-        <div class="dd-title do">What to do</div>
-        <ul><li *ngFor="let item of dosDonts.do">{{ item }}</li></ul>
-      </div>
-      <div class="dd-block" *ngIf="dosDonts.dont.length">
-        <div class="dd-title dont">What to avoid</div>
-        <ul><li *ngFor="let item of dosDonts.dont">{{ item }}</li></ul>
-      </div>
-    </div>
-
-    <!-- Pollutants -->
-    <hr class="divider"/>
-    <div class="sec-label">Pollutant Readings</div>
-    <div class="row" *ngFor="let e of pollutantEntries()">
-      <span>{{ e.label }}</span>
-      <span class="val" [style.color]="dom === e.key ? info.col : '#8ba4c8'">{{ formatVal(e.key, e.val) }}</span>
-    </div>
-
-    <!-- Primary concern -->
-    <ng-container *ngIf="polEff">
-      <hr class="divider"/>
-      <div class="sec-label">Primary Concern</div>
-      <div class="concern-card" [style.border-left]="'2px solid ' + polEff.color">
-        <div class="concern-label" [style.color]="polEff.color">{{ polEff.label }}</div>
-        <div class="concern-source">Source: {{ polEff.source }}</div>
-        <div class="concern-effect">{{ polEff.effect }}</div>
-      </div>
-    </ng-container>
-
-    <hr class="divider"/>
-    <div class="advice">{{ info.advice }}</div>
-
-    <div *ngIf="detail.baseline30" class="baseline">
-      30-day avg: <span [style.color]="aqiColor(detail.baseline30)">{{ detail.baseline30 }}</span>
-      <span *ngIf="(aqiValue ?? 0) > detail.baseline30 * 1.5" class="above"> above normal</span>
-      <span *ngIf="(aqiValue ?? 0) < detail.baseline30 * 0.7" class="below"> better than usual</span>
+    <!-- Cold-start hint (shows after 3 s) -->
+    <div class="wakeup-notice" *ngIf="loadingTooLong">
+      <span class="wakeup-icon">⚡</span>
+      Waking up server&hellip; usually takes 10–15 s on first load.
     </div>
   </ng-container>
+
+  <!-- ── Error state ───────────────────────────────────────────────────── -->
+  <ng-container *ngIf="!loading && error">
+    <div class="panel-error">
+      <div class="error-icon">⚠️</div>
+      <p class="error-msg">{{ errorMessage }}</p>
+      <button class="retry-btn" (click)="loadData()">Retry</button>
+    </div>
+  </ng-container>
+
+  <!-- ── Data state (aria-live announces changes to screen readers) ─────── -->
+  <div aria-live="polite" aria-atomic="true">
+    <ng-container *ngIf="!loading && !error && detail">
+
+      <div class="panel-header">
+        <h2 class="country-name">{{ detail.countryName }}</h2>
+        <span class="country-code">{{ countryCode }}</span>
+      </div>
+
+      <!-- AQI badge -->
+      <div class="aqi-badge" [style.background-color]="aqiColor(detail.avgAqi!)">
+        <span class="aqi-value">{{ detail.avgAqi }}</span>
+        <span class="aqi-unit">AQI</span>
+      </div>
+
+      <p class="aqi-category">{{ aqiLabel(detail.avgAqi!) }}</p>
+
+      <!-- Written summary (pre-computed, not a getter) -->
+      <p class="written-summary" *ngIf="writtenSummary">{{ writtenSummary }}</p>
+
+      <!-- Dominant pollutant -->
+      <div class="detail-row" *ngIf="detail.dominentpol">
+        <span class="detail-label">Dominant pollutant</span>
+        <span class="detail-value">{{ detail.dominentpol | uppercase }}</span>
+      </div>
+
+      <!-- 30-day baseline -->
+      <div class="detail-row" *ngIf="detail.baseline30">
+        <span class="detail-label">30-day avg</span>
+        <span class="detail-value">{{ detail.baseline30 }}</span>
+      </div>
+
+      <!-- Trend -->
+      <div class="detail-row" *ngIf="detail.trend?.trend">
+        <span class="detail-label">Trend</span>
+        <span class="detail-value trend-arrow" [style.color]="detail.trend.trend.color">
+          {{ detail.trend.trend.arrow }} {{ detail.trend.trend.label }}
+        </span>
+      </div>
+
+      <!-- Station count -->
+      <div class="detail-row" *ngIf="detail.stationCount">
+        <span class="detail-label">Stations</span>
+        <span class="detail-value">{{ detail.stationCount }}</span>
+      </div>
+
+      <!-- Sparkline history chart -->
+      <div class="history-section" *ngIf="history.length > 1">
+        <h4 class="section-title">Last 12 hours</h4>
+        <div class="sparkline-wrap">
+          <svg class="sparkline" viewBox="0 0 200 50" preserveAspectRatio="none">
+            <polyline
+              [attr.points]="buildSparkline(history)"
+              fill="none"
+              stroke="var(--accent, #4fc3f7)"
+              stroke-width="2"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+            />
+          </svg>
+        </div>
+      </div>
+
+      <!-- IAQI breakdown -->
+      <div class="iaqi-grid" *ngIf="detail['iaqi']">
+        <ng-container *ngFor="let key of ['pm25','pm10','no2','o3','so2','co']">
+          <div class="iaqi-cell" *ngIf="detail['iaqi'][key] != null">
+            <span class="iaqi-key">{{ key }}</span>
+            <span class="iaqi-val">{{ detail['iaqi'][key] | number:'1.0-1' }}</span>
+          </div>
+        </ng-container>
+      </div>
+
+    </ng-container>
+  </div>
+
+  <!-- ── Empty state (panel open but no country yet) ───────────────────── -->
+  <ng-container *ngIf="!loading && !error && !detail && countryCode">
+    <div class="panel-empty">
+      <p>No data available for this country.</p>
+    </div>
+  </ng-container>
+
 </div>

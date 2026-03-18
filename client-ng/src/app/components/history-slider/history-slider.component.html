@@ -1,0 +1,31 @@
+<div class="slider-container" *ngIf="snapshots.length > 0">
+  <div class="slider-header">
+    <span class="slider-title">Time Travel</span>
+    <button class="live-btn" [class.is-live]="isLive" (click)="jumpToLive()">
+      <span class="live-dot"></span>
+      {{ isLive ? 'LIVE' : 'VIEWING PAST' }}
+    </button>
+  </div>
+
+  <div class="range-wrap">
+    <input
+      type="range"
+      [min]="0"
+      [max]="snapshots.length - 1"
+      [value]="currentIndex"
+      (input)="onSliderInput($event)"
+      class="history-range"
+    />
+    <div class="tick-labels">
+      <span *ngFor="let label of tickLabels; let i = index" 
+            class="tick" 
+            [class.tick-active]="i === currentIndex">
+        {{ label }}
+      </span>
+    </div>
+  </div>
+
+  <div class="selected-time" *ngIf="selectedSnapshot">
+    {{ formatLabel(selectedSnapshot.timestamp) }}
+  </div>
+</div>

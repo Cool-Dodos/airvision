@@ -1,0 +1,158 @@
+.share-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(4, 12, 30, 0.85);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.share-card {
+  background: #0a1e3a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 440px;
+  padding: 32px;
+  position: relative;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.close-btn {
+  position: absolute;
+  top: 16px; right: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  color: #8ba4c8;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.share-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.share-aqi-badge {
+  width: 80px; height: 80px;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.share-aqi-val {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+}
+
+.share-aqi-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.share-country {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.share-category {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #8ba4c8;
+  font-weight: 500;
+}
+
+.share-preview {
+  background: rgba(255, 255, 255, 0.03);
+  border-left: 3px solid #4f46e5;
+  padding: 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #c8d8f0;
+  margin: 0 0 32px;
+  font-family: inherit;
+}
+
+.share-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.share-btn {
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.share-btn:active {
+  transform: scale(0.96);
+}
+
+.share-btn--copy {
+  background: #4f46e5;
+  color: #fff;
+}
+
+.share-btn--copy:hover {
+  background: #4338ca;
+}
+
+.share-btn--native {
+  background: #10b981;
+  color: #fff;
+}
+
+.share-btn--twitter {
+  background: #fff;
+  color: #000;
+}
+
+.share-btn--whatsapp {
+  background: #25d366;
+  color: #fff;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}

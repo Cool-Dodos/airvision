@@ -1,41 +1,61 @@
-import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-
-// If on Vercel/Production, point to the Render backend. 
-// If on localhost, use empty string (proxy.conf.json handles it)
-const IS_PROD = !window.location.hostname.includes('localhost');
-const BASE = IS_PROD ? 'https://airvision-xcg9.onrender.com' : ''; 
+import { Injectable, Inject } from '@angular/core';
+import { HttpClient }         from '@angular/common/http';
+import { Observable }         from 'rxjs';
+import { environment }        from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class AqiService {
+
+  // Single source of truth: reads from Angular environment.ts
+  // environment.apiUrl = 'https://airvision-xcg9.onrender.com/api' in production
+  // environment.apiUrl = 'http://localhost:5000/api' in development
+  // This replaces the fragile window.location.hostname !== 'localhost' check.
+  private readonly base = environment.apiUrl;
+
   constructor(private http: HttpClient) {}
 
-  getWorld(): Observable<any> {
-    return this.http.get<any>(`${BASE}/api/aqi/world`);
+  /** Latest AQI snapshot for all countries */
+  getWorldData(): Observable<any> {
+    return this.http.get(`${this.base}/aqi/world`);
   }
 
-  getCountry(code: string): Observable<any> {
-    return this.http.get<any>(`${BASE}/api/aqi/country/${code}`);
+  /** Country detail + trend + 30-day baseline */
+  getCountryDetail(code: string): Observable<any> {
+    return this.http.get(`${this.base}/aqi/country/${code.toUpperCase()}`);
   }
 
+  /** Last 48 readings (12h) for sparkline */
   getHistory(code: string): Observable<any> {
-    return this.http.get<any>(`${BASE}/api/aqi/history/${code}`);
+    return this.http.get(`${this.base}/aqi/history/${code.toUpperCase()}`);
   }
 
+  /** India state-level AQI */
+  getIndiaStates(): Observable<any> {
+    return this.http.get(`${this.base}/aqi/india/states`);
+  }
+
+  /** Anomaly list (countries 80%+ above 30-day baseline) */
   getAnomalies(): Observable<any> {
-    return this.http.get<any>(`${BASE}/api/aqi/anomalies`);
+    return this.http.get(`${this.base}/aqi/anomalies`);
   }
 
-  getWindGrid(): Observable<any> {
-    return this.http.get<any>(`${BASE}/api/weather/wind`);
+  /** All snapshot timestamps (capped at last 96 = 24h) */
+  getSnapshots(): Observable<any> {
+    return this.http.get(`${this.base}/aqi/snapshots`);
   }
 
-  getSnapshots(): Observable<any[]> {
-    return this.http.get<any[]>(`${BASE}/api/aqi/snapshots`);
-  }
-
+  /** Single historical snapshot by ISO timestamp */
   getSnapshot(timestamp: string): Observable<any> {
-    return this.http.get<any>(`${BASE}/api/aqi/snapshot/${timestamp}`);
+    return this.http.get(`${this.base}/aqi/snapshot/${encodeURIComponent(timestamp)}`);
+  }
+
+  /** Country boundary GeoJSON (proxied through backend) */
+  getBoundary(iso2: string): Observable<any> {
+    return this.http.get(`${this.base}/aqi/boundaries/${iso2.toUpperCase()}`);
+  }
+
+  /** Weather for globe atmosphere layer */
+  getWeather(lat: number, lon: number): Observable<any> {
+    return this.http.get(`${this.base}/weather?lat=${lat}&lon=${lon}`);
   }
 }

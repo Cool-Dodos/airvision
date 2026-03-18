@@ -3,11 +3,18 @@ const axios = require('axios');
 const BASE  = 'https://api.waqi.info';
 const TOKEN = () => process.env.WAQI_TOKEN;
 
+// Normalize state names for matching — strips diacritics, lowercases, trims
+// Use this on BOTH the key side and the GeoJSON property side to avoid mismatches
+function normalizeStateName(name) {
+  if (!name) return '';
+  return name.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip combining diacritics
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // ─── Country config ────────────────────────────────────────────────────────
-// city:  WAQI /feed/{city}/ — NO hyphens, plain names only (e.g. "sao paulo" not "sao-paulo")
-// alt:   Alternative city names to try if primary fails
-// geo:   Capital city [lat, lon] — WAQI geo endpoint fallback, nearly always works
-// name:  Display name
 const COUNTRY_CITIES = {
   AF: { name:'Afghanistan',           city:'kabul',              geo:[34.52,69.18] },
   AL: { name:'Albania',               city:'tirana',             geo:[41.33,19.82] },
@@ -219,24 +226,17 @@ async function fetchCityAQI(city) {
     const aqi = typeof d.aqi === 'number' ? d.aqi : parseInt(d.aqi);
     if (!aqi || isNaN(aqi) || aqi <= 0) return null;
     return {
-      aqi,
-      dominentpol: d.dominentpol || null,
-      city: d.city?.name || city,
-      time: d.time?.s || null,
+      aqi, dominentpol: d.dominentpol || null,
+      city: d.city?.name || city, time: d.time?.s || null,
       iaqi: {
-        pm25: d.iaqi?.pm25?.v ?? null,
-        pm10: d.iaqi?.pm10?.v ?? null,
-        no2:  d.iaqi?.no2?.v  ?? null,
-        o3:   d.iaqi?.o3?.v   ?? null,
-        co:   d.iaqi?.co?.v   ?? null,
-        so2:  d.iaqi?.so2?.v  ?? null,
+        pm25: d.iaqi?.pm25?.v ?? null, pm10: d.iaqi?.pm10?.v ?? null,
+        no2:  d.iaqi?.no2?.v  ?? null, o3:   d.iaqi?.o3?.v   ?? null,
+        co:   d.iaqi?.co?.v   ?? null, so2:  d.iaqi?.so2?.v  ?? null,
       }
     };
   } catch { return null; }
 }
 
-// Geo-based lookup — uses WAQI's nearest station to coordinates
-// This is the most reliable fallback; works for ~150+ countries
 async function fetchGeoAQI(lat, lon) {
   try {
     const url = `${BASE}/feed/geo:${lat};${lon}/?token=${TOKEN()}`;
@@ -246,23 +246,17 @@ async function fetchGeoAQI(lat, lon) {
     const aqi = typeof d.aqi === 'number' ? d.aqi : parseInt(d.aqi);
     if (!aqi || isNaN(aqi) || aqi <= 0) return null;
     return {
-      aqi,
-      dominentpol: d.dominentpol || null,
-      city: d.city?.name || null,
-      time: d.time?.s || null,
+      aqi, dominentpol: d.dominentpol || null,
+      city: d.city?.name || null, time: d.time?.s || null,
       iaqi: {
-        pm25: d.iaqi?.pm25?.v ?? null,
-        pm10: d.iaqi?.pm10?.v ?? null,
-        no2:  d.iaqi?.no2?.v  ?? null,
-        o3:   d.iaqi?.o3?.v   ?? null,
-        co:   d.iaqi?.co?.v   ?? null,
-        so2:  d.iaqi?.so2?.v  ?? null,
+        pm25: d.iaqi?.pm25?.v ?? null, pm10: d.iaqi?.pm10?.v ?? null,
+        no2:  d.iaqi?.no2?.v  ?? null, o3:   d.iaqi?.o3?.v   ?? null,
+        co:   d.iaqi?.co?.v   ?? null, so2:  d.iaqi?.so2?.v  ?? null,
       }
     };
   } catch { return null; }
 }
 
-// Search fallback — useful when city name routing fails
 async function searchAQI(query) {
   try {
     const { data } = await axios.get(
@@ -270,88 +264,52 @@ async function searchAQI(query) {
       { timeout: 5000 }
     );
     if (data.status !== 'ok' || !data.data?.length) return null;
-    const station = data.data.find(s => {
-      const a = parseInt(s.aqi);
-      return a > 0 && !isNaN(a);
-    });
+    const station = data.data.find(s => { const a = parseInt(s.aqi); return a > 0 && !isNaN(a); });
     if (!station) return null;
     return fetchCityAQI(`@${station.uid}`);
   } catch { return null; }
 }
 
-// Per-country fetch with 3-tier fallback:
-// 1. Primary city name
-// 2. Alt city names (if provided)
-// 3. Geo-coordinate nearest station (capital city lat/lng)
-// 4. Country search by name
 async function fetchCountryData(code) {
   const entry = COUNTRY_CITIES[code];
   if (!entry) return null;
-
-  // Tier 1: Primary city
   let result = await fetchCityAQI(entry.city);
   if (result) return result;
-
-  // Tier 2: Alt cities
   if (entry.alt) {
     for (const alt of entry.alt) {
       result = await fetchCityAQI(alt);
       if (result) return result;
     }
   }
-
-  // Tier 3: Geo-coordinate lookup (most reliable for missing countries)
   if (entry.geo) {
     result = await fetchGeoAQI(entry.geo[0], entry.geo[1]);
     if (result) return result;
   }
-
-  // Tier 4: Search by country name
-  result = await searchAQI(entry.name);
-  return result;
+  return searchAQI(entry.name);
 }
-
-// ─── Batch fetch all countries ─────────────────────────────────────────────
 
 async function fetchAllCountries() {
   const codes = Object.keys(COUNTRY_CITIES);
   const results = {};
   const BATCH = 10;
-
   for (let i = 0; i < codes.length; i += BATCH) {
     const batch = codes.slice(i, i + BATCH);
     await Promise.all(batch.map(async (code) => {
       const data = await fetchCountryData(code);
-      if (data && data.aqi != null) {
-        results[code] = {
-          ...data,
-          countryCode: code,
-          countryName: COUNTRY_CITIES[code].name,
-        };
+      if (data?.aqi != null) {
+        results[code] = { ...data, countryCode: code, countryName: COUNTRY_CITIES[code].name };
       }
     }));
-    // Small delay between batches to respect rate limits
-    if (i + BATCH < codes.length) {
-      await new Promise(r => setTimeout(r, 500));
-    }
+    if (i + BATCH < codes.length) await new Promise(r => setTimeout(r, 500));
   }
-
-  const total   = Object.keys(results).length;
-  const missing = codes.filter(c => !results[c]);
-  console.log(`[WAQI] ${total}/${codes.length} countries fetched. Missing: ${missing.join(', ')}`);
-
+  const missing = Object.keys(COUNTRY_CITIES).filter(c => !results[c]);
+  console.log(`[WAQI] ${Object.keys(results).length}/${codes.length} countries. Missing: ${missing.join(', ')}`);
   return results;
 }
 
-// ─── Single country fetch (for /api/aqi/country/:code) ────────────────────
+async function fetchSingleCountry(code) { return fetchCountryData(code); }
 
-async function fetchSingleCountry(code) {
-  return fetchCountryData(code);
-}
-
-// ─── Map bounds (station dots) ─────────────────────────────────────────────
-
-async function fetchMapBounds(lat1 = -60, lng1 = -180, lat2 = 75, lng2 = 180) {
+async function fetchMapBounds(lat1=-60, lng1=-180, lat2=75, lng2=180) {
   try {
     const { data } = await axios.get(
       `${BASE}/map/bounds/?latlng=${lat1},${lng1},${lat2},${lng2}&token=${TOKEN()}`,
@@ -363,51 +321,53 @@ async function fetchMapBounds(lat1 = -60, lng1 = -180, lat2 = 75, lng2 = 180) {
       aqi: typeof s.aqi === 'number' ? s.aqi : parseInt(s.aqi) || 0,
       station: s.station?.name || ''
     }));
-  } catch (e) {
-    console.error('fetchMapBounds error:', e.message);
-    return [];
-  }
+  } catch (e) { console.error('fetchMapBounds error:', e.message); return []; }
 }
 
-// ─── India state-level AQI ─────────────────────────────────────────────────
-// Key = state/UT name (matches assets/india-states-new.json), value = { cities: string[], geo: [lat, lon] }
+// ─── India state config ────────────────────────────────────────────────────
+// IMPORTANT: Keys MUST match the shapeName/name properties in india-states-simplified.json
+// "Odisha" (not "Orissa") — renamed in 2011
+// "Uttarakhand" (not "Uttaranchal") — renamed in 2000
+// Diacritics handled by normalizeStateName() used in fetchIndiaStates()
 const INDIA_STATES = {
-  'Andaman and Nicobar': { cities: ['Port Blair', 'Biju Patnaik Airport'], geo: [11.67, 92.74] }, // Port Blair was in my list
-  'Andhra Pradesh':      { cities: ['Secretariat, Amaravati, India', 'Amaravati', 'Visakhapatnam', 'Tirumala-APPCB', 'Tirupati'], geo: [17.68, 83.22] },
-  'Arunachal Pradesh':   { cities: ['Arunachal Pradesh, Naharlagun, Itanagar, India', 'Itanagar'], geo: [27.08, 93.62] },
-  'Assam':               { cities: ['Railway Colony, Guwahati, India', 'Guwahati', 'Silchar', 'Connectivity Office, Silchar', 'Gariaat, Silchar'], geo: [26.19, 91.75] },
-  'Bihar':               { cities: ['Arrah', 'Bhagalpur', 'Biharsharif', 'Gaya', 'Hajipur', 'Katihar', 'Kishanganj', 'Motihari', 'Muzaffarpur', 'Patna', 'Saharsa'], geo: [25.59, 85.14] },
-  'Chandigarh':          { cities: ['Chandigarh', 'Sector 6 Panchkula'], geo: [30.73, 76.78] },
-  'Chhattisgarh':        { cities: ['DDU Nagar, Raipur, India', 'Raipur'], geo: [21.25, 81.63] },
-  'Delhi':               { cities: ['Delhi', 'Alipur', 'Anand Vihar', 'Chandni Chowk', 'Dilshad Garden', 'Dwarka Sector 8', 'Income Tax Office', 'Jhilmil Industrial Area', 'Kailash Hills', 'Karkardooma', 'Lodhi Road'], geo: [28.61, 77.21] },
-  'Dādra and Nagar Haveli and Damān and Diu': { cities: ['Daman', 'Silvassa'], geo: [20.40, 72.83] },
-  'Goa':                 { cities: ['Mahabaleshwar', 'Panaji'], geo: [15.49, 73.83] },
-  'Gujarat':             { cities: ['Ahmedabad', 'Gandhinagar', 'Vapi', 'Vatva', 'Surat'], geo: [23.03, 72.58] },
-  'Haryana':             { cities: ['Ambala', 'Bahadurgarh', 'Faridabad', 'Gurugram', 'Hisar', 'Jind', 'Kaithal', 'Karnal', 'Kurukshetra', 'Manesar', 'Narnaul', 'Palwal', 'Panchkula', 'Panipat', 'Rewari', 'Rohtak'], geo: [28.41, 77.31] },
-  'Himachal Pradesh':    { cities: ['Dharamshala', 'Shimla', 'Solan', 'Mandi'], geo: [31.10, 77.17] },
-  'Jammu and Kashmir':   { cities: ['Srinagar', 'Rajbagh, Srinagar'], geo: [34.08, 74.80] },
-  'Jharkhand':           { cities: ['Ranchi', 'Jamshedpur', 'Dhanbad'], geo: [23.34, 85.31] },
-  'Karnataka':           { cities: ['Bengaluru', 'Bagalkot', 'Chamarajanagar', 'Hassan', 'Madikeri', 'Ramanagara', 'Shivamogga', 'Tumakuru'], geo: [12.97, 77.59] },
-  'Kerala':              { cities: ['Kochi', 'Kollam', 'Kannur', 'Eloor'], geo: [9.94, 76.26] },
-  'Ladakh':              { cities: ['Leh', 'Kargil'], geo: [34.16, 77.58] },
-  'Lakshadweep':         { cities: ['Kavaratti', 'Kochi'], geo: [10.57, 72.64] },
-  'Madhya Pradesh':      { cities: ['Bhopal', 'Indore', 'Gwalior', 'Jabalpur', 'Mandideep', 'Ratlam', 'Singrauli', 'Damoh', 'Pithampur'], geo: [23.26, 77.40] },
-  'Maharashtra':         { cities: ['Mumbai', 'Aurangabad', 'Kalyan', 'Mahabaleshwar', 'Matheran', 'Nagpur', 'Nashik', 'Navi Mumbai', 'Pune', 'Solapur', 'Thane'], geo: [19.08, 72.88] },
-  'Manipur':             { cities: ['Imphal', 'Meirabak'], geo: [24.82, 93.94] },
-  'Meghalaya':           { cities: ['Shillong', 'Guwahati'], geo: [25.57, 91.88] },
-  'Mizoram':             { cities: ['Aizawl', 'Chandmari, Aizawl', 'Sikulpuikawn'], geo: [23.73, 92.72] },
-  'Nagaland':            { cities: ['Kohima', 'PWD Juction, Kohima'], geo: [25.67, 94.11] },
-  'Orissa':              { cities: ['Bhubaneswar', 'Cuttack', 'Talcher'], geo: [20.30, 85.85] },
-  'Puducherry':          { cities: ['Pondicherry', 'Chennai'], geo: [11.94, 79.83] },
-  'Punjab':              { cities: ['Amritsar', 'Ludhiana', 'Kapurthala', 'Mandi Gobindgarh', 'Patiala', 'Rupnagar'], geo: [31.63, 74.87] },
-  'Rajasthan':           { cities: ['Jaipur', 'Ajmer', 'Alwar', 'Bhiwadi', 'Chomu', 'Jodhpur', 'Kota', 'Pali', 'Sriganganagar', 'Udaipur'], geo: [26.92, 75.79] },
-  'Sikkim':              { cities: ['Gangtok', 'Zero Point GICI, Gangtok'], geo: [27.33, 88.61] },
-  'Tamil Nadu':          { cities: ['Chennai', 'Arakkonam', 'Coimbatore', 'Kovilpatti', 'Madurai'], geo: [13.08, 80.27] },
-  'Telangana':           { cities: ['Hyderabad', 'Bahadurpura West, Hyderabad', 'Somajiguda, Hyderabad', 'Zoo Park, Bahadurpura West'], geo: [17.38, 78.47] },
-  'Tripura':             { cities: ['Agartala', 'Silchar'], geo: [23.83, 91.28] },
-  'Uttar Pradesh':       { cities: ['Lucknow', 'Agra', 'Allahabad', 'Baghpat', 'Bareilly', 'Bulandshahr', 'Firozabad', 'Ghaziabad', 'Jhansi', 'Kanpur', 'Meerut', 'Moradabad', 'Muzaffarnagar', 'Varanasi', 'Vrindavan'], geo: [26.85, 80.95] },
-  'Uttaranchal':         { cities: ['Dehradun', 'Haridwar', 'MDDA Colony, Dehradun'], geo: [30.32, 78.03] },
-  'West Bengal':         { cities: ['Kolkata', 'Asansol', 'Burdwan', 'Durgapur', 'Haldia', 'Kharagpur', 'Midnapore', 'Siliguri'], geo: [22.57, 88.36] },
+  'Andaman and Nicobar':    { cities: ['Port Blair'],                  geo: [11.67, 92.74] },
+  'Andhra Pradesh':         { cities: ['Secretariat, Amaravati, India','Visakhapatnam','Tirumala-APPCB'], geo: [17.68, 83.22] },
+  'Arunachal Pradesh':      { cities: ['Naharlagun','Itanagar'],        geo: [27.08, 93.62] },
+  'Assam':                  { cities: ['Railway Colony, Guwahati, India','Guwahati'], geo: [26.19, 91.75] },
+  'Bihar':                  { cities: ['Patna','Arrah','Bhagalpur','Gaya','Muzaffarpur'], geo: [25.59, 85.14] },
+  'Chandigarh':             { cities: ['Chandigarh'],                   geo: [30.73, 76.78] },
+  'Chhattisgarh':           { cities: ['Raipur','Bhilai'],              geo: [21.25, 81.63] },
+  'Dadra and Nagar Haveli and Daman and Diu': { cities: ['Daman','Silvassa','Vapi'], geo: [20.40, 72.83] },
+  'Delhi':                  { cities: ['Delhi','Anand Vihar','Mundka'],  geo: [28.61, 77.21] },
+  'Goa':                    { cities: ['Panaji'],                        geo: [15.49, 73.83] },
+  'Gujarat':                { cities: ['Ahmedabad','Gandhinagar','Vapi','Surat'], geo: [23.03, 72.58] },
+  'Haryana':                { cities: ['Faridabad','Gurugram','Hisar','Karnal','Panipat'], geo: [28.41, 77.31] },
+  'Himachal Pradesh':       { cities: ['Shimla','Dharamshala','Baddi'],  geo: [31.10, 77.17] },
+  'Jammu and Kashmir':      { cities: ['Srinagar','Rajbagh, Srinagar'],  geo: [34.08, 74.80] },
+  'Jharkhand':              { cities: ['Ranchi','Jamshedpur','Dhanbad'],  geo: [23.34, 85.31] },
+  'Karnataka':              { cities: ['Bengaluru','Mysuru','Hubballi'],  geo: [12.97, 77.59] },
+  'Kerala':                 { cities: ['Kochi','Kollam','Kannur','Eloor'], geo: [9.94, 76.26] },
+  'Ladakh':                 { cities: ['Leh','Kargil'],                   geo: [34.16, 77.58] },
+  'Lakshadweep':            { cities: ['Kavaratti'],                      geo: [10.57, 72.64] },
+  'Madhya Pradesh':         { cities: ['Bhopal','Indore','Gwalior','Jabalpur'], geo: [23.26, 77.40] },
+  'Maharashtra':            { cities: ['Mumbai','Nagpur','Nashik','Pune'], geo: [19.08, 72.88] },
+  'Manipur':                { cities: ['Imphal'],                          geo: [24.82, 93.94] },
+  'Meghalaya':              { cities: ['Shillong'],                        geo: [25.57, 91.88] },
+  'Mizoram':                { cities: ['Aizawl','Sikulpuikawn'],           geo: [23.73, 92.72] },
+  'Nagaland':               { cities: ['Kohima'],                          geo: [25.67, 94.11] },
+  // FIXED: was "Orissa" — official name is "Odisha" since 2011
+  'Odisha':                 { cities: ['Bhubaneswar','Cuttack','Talcher'], geo: [20.30, 85.85] },
+  'Puducherry':             { cities: ['Pondicherry'],                     geo: [11.94, 79.83] },
+  'Punjab':                 { cities: ['Amritsar','Ludhiana','Patiala'],   geo: [31.63, 74.87] },
+  'Rajasthan':              { cities: ['Jaipur','Jodhpur','Kota','Udaipur'], geo: [26.92, 75.79] },
+  'Sikkim':                 { cities: ['Gangtok','Zero Point GICI, Gangtok'], geo: [27.33, 88.61] },
+  'Tamil Nadu':             { cities: ['Chennai','Coimbatore','Madurai'],  geo: [13.08, 80.27] },
+  'Telangana':              { cities: ['Hyderabad','Somajiguda, Hyderabad'], geo: [17.38, 78.47] },
+  'Tripura':                { cities: ['Agartala'],                         geo: [23.83, 91.28] },
+  'Uttar Pradesh':          { cities: ['Lucknow','Agra','Kanpur','Varanasi','Meerut'], geo: [26.85, 80.95] },
+  // FIXED: was "Uttaranchal" — official name is "Uttarakhand" since 2000
+  'Uttarakhand':            { cities: ['Dehradun','Haridwar'],              geo: [30.32, 78.03] },
+  'West Bengal':            { cities: ['Kolkata','Asansol','Durgapur','Siliguri'], geo: [22.57, 88.36] },
 };
 
 async function fetchIndiaStates() {
@@ -422,23 +382,24 @@ async function fetchIndiaStates() {
         let data = null;
         for (const city of cfg.cities) {
           data = await fetchCityAQI(city);
-          if (data && data.aqi != null) break;
+          if (data?.aqi != null) break;
         }
-        if (!data || data.aqi == null) {
-          data = await fetchGeoAQI(cfg.geo[0], cfg.geo[1]);
-        }
-        if (data && data.aqi != null) {
-          results[state] = { aqi: data.aqi, city: data.city || cfg.cities[0] };
+        if (!data?.aqi) data = await fetchGeoAQI(cfg.geo[0], cfg.geo[1]);
+        if (data?.aqi != null) {
+          // Store under normalized key so globe lookup is diacritic-tolerant
+          const key = normalizeStateName(state);
+          results[key] = { aqi: data.aqi, city: data.city || cfg.cities[0], rawName: state };
         }
       } catch { /* skip */ }
     }));
-    if (i + BATCH < entries.length) {
-      await new Promise(r => setTimeout(r, 500));
-    }
+    if (i + BATCH < entries.length) await new Promise(r => setTimeout(r, 500));
   }
 
   console.log(`[WAQI] India states: ${Object.keys(results).length}/${entries.length} fetched`);
   return results;
 }
 
-module.exports = { fetchAllCountries, fetchSingleCountry, fetchCityAQI, fetchGeoAQI, fetchMapBounds, fetchIndiaStates, COUNTRY_CITIES };
+module.exports = {
+  fetchAllCountries, fetchSingleCountry, fetchCityAQI, fetchGeoAQI,
+  fetchMapBounds, fetchIndiaStates, normalizeStateName, COUNTRY_CITIES
+};
