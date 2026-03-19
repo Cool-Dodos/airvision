@@ -28,7 +28,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   aqiData: Record<string, any> = {};
   selectedCode: string | null = null;
-  selectedState: { name: string; aqi: number | null; col: string; cat: string; safe: string } | null = null;
+  selectedState: { name: string; aqi: number | null; col: string; cat: string; safe: string; station?: string } | null = null;
   focusCountry: string | null = null;
   lastUpdated: Date | null = null;
   loading = true;

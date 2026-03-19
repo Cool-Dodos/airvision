@@ -92,15 +92,10 @@ export default function App() {
         ))}
       </div>
 
-      {/* Anomaly feed (center top) */}
       <AnomalyFeed onCountryClick={setSelectedCode} />
-
-      {/* Country detail panel */}
       <InfoPanel countryCode={selectedCode} onClose={() => setSelectedCode(null)} />
-
       <div className="hint">Scroll to zoom · names appear when zoomed · click any country</div>
 
-      {/* Ticker */}
       <div className="ticker">
         <div className="ticker-label">AQI Feed</div>
         <div className="ticker-track"><div className="ticker-inner" ref={tickerRef} /></div>

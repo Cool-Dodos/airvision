@@ -7,11 +7,24 @@ const TOKEN = () => process.env.WAQI_TOKEN;
 // Use this on BOTH the key side and the GeoJSON property side to avoid mismatches
 function normalizeStateName(name) {
   if (!name) return '';
-  return name.toLowerCase()
+  let n = name.toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // strip combining diacritics
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+  
+  // Alias mapping for common GeoJSON vs WAQI mismatches
+  const aliases = {
+    'utranchal':    'uttarakhand',
+    'uttranchal':   'uttarakhand',
+    'uttaranchal':  'uttarakhand',
+    'orissa':       'odisha',
+    'orissam':      'odisha',
+    'orrisa':       'odisha',
+    'puduchcheri':  'puducherry',
+    'pondicherry':  'puducherry'
+  };
+  return aliases[n] || n;
 }
 
 // ─── Country config ────────────────────────────────────────────────────────
@@ -140,7 +153,7 @@ const COUNTRY_CITIES = {
   MM: { name:'Myanmar',               city:'yangon',             alt:['mandalay','naypyidaw'], geo:[16.87,96.19] },
   NA: { name:'Namibia',               city:'windhoek',           geo:[-22.56,17.08]},
   NR: { name:'Nauru',                 city:'yaren',              geo:[-0.55,166.92]},
-  NP: { name:'Nepal',                 city:'kathmandu',          geo:[27.72,85.32] },
+  NP: { name:'Nepal',                 city:'@12423',             alt:['kathmandu','ktm'], geo:[27.72,85.32] },
   NL: { name:'Netherlands',           city:'amsterdam',          alt:['rotterdam','the hague'], geo:[52.37,4.90] },
   NZ: { name:'New Zealand',           city:'auckland',           alt:['wellington','christchurch'], geo:[-36.87,174.77] },
   NI: { name:'Nicaragua',             city:'managua',            geo:[12.15,-86.28]},
@@ -220,7 +233,7 @@ const COUNTRY_CITIES = {
 async function fetchCityAQI(city) {
   try {
     const url = `${BASE}/feed/${encodeURIComponent(city)}/?token=${TOKEN()}`;
-    const { data } = await axios.get(url, { timeout: 5000 });
+    const { data } = await axios.get(url, { timeout: 10000 });
     if (data.status !== 'ok' || !data.data || data.data === 'Unknown station') return null;
     const d = data.data;
     const aqi = typeof d.aqi === 'number' ? d.aqi : parseInt(d.aqi);
@@ -240,7 +253,7 @@ async function fetchCityAQI(city) {
 async function fetchGeoAQI(lat, lon) {
   try {
     const url = `${BASE}/feed/geo:${lat};${lon}/?token=${TOKEN()}`;
-    const { data } = await axios.get(url, { timeout: 5000 });
+    const { data } = await axios.get(url, { timeout: 10000 });
     if (data.status !== 'ok' || !data.data) return null;
     const d = data.data;
     const aqi = typeof d.aqi === 'number' ? d.aqi : parseInt(d.aqi);
@@ -285,7 +298,18 @@ async function fetchCountryData(code) {
     result = await fetchGeoAQI(entry.geo[0], entry.geo[1]);
     if (result) return result;
   }
-  return searchAQI(entry.name);
+  
+  // Last resort: deep search by name
+  result = await searchAQI(entry.name);
+  if (result) return result;
+
+  // Final attempt: search specifically for 'Kathmandu' if it's Nepal
+  if (code === 'NP') {
+    result = await searchAQI('Kathmandu');
+    if (result) return result;
+  }
+  
+  return null;
 }
 
 async function fetchAllCountries() {

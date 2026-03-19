@@ -113,7 +113,7 @@ export default function InfoPanel({ countryCode, onClose }) {
           )}
         </>}
 
-        {/* Health dashboard */}
+        
         <hr style={S.divider} />
         <div style={S.sectionLabel}>Health Advisory</div>
         <div style={S.row}>Healthy adults<span style={S.val}>{safeTime.healthy}</span></div>
@@ -127,7 +127,7 @@ export default function InfoPanel({ countryCode, onClose }) {
         </div>
         {mask.needed && <div style={{ fontSize: 10, color: '#ff7e00', marginBottom: 8, textAlign: 'right' }}>{mask.note}</div>}
 
-        {/* Pollutant readings */}
+       
         <hr style={S.divider} />
         <div style={S.sectionLabel}>Pollutant Readings</div>
         {detail.iaqi && Object.entries(POLLUTANT_LABELS).map(([key, label]) => {
@@ -145,7 +145,6 @@ export default function InfoPanel({ countryCode, onClose }) {
           );
         })}
 
-        {/* Dominant pollutant effect card */}
         {polEff && <>
           <hr style={S.divider} />
           <div style={S.sectionLabel}>Primary Concern</div>

@@ -102,7 +102,7 @@ router.get('/stations', async (req, res) => {
 // India states local cache removed for MongoDB-based StateSnapshot (patch 3.1.4)
 
 // GET /api/aqi/india/states — state-level AQI for India drill-down
-router.get('/india/states', expensiveLimiter, async (req, res) => {
+router.get('/india/states', async (req, res) => {
   try {
     const TTL = 20 * 60 * 1000; // 20 minutes
     const now = new Date();
@@ -165,7 +165,9 @@ router.get('/snapshot/:timestamp', async (req, res) => {
 
 // GET /api/aqi/boundaries/:iso2 — proxy for GeoBoundaries (with SSRF guard)
 router.get('/boundaries/:iso2', async (req, res) => {
-  const iso2 = req.params.iso2.toUpperCase();
+  let iso2 = req.params.iso2.toUpperCase();
+  const isoMap = { 'AF': 'AFG', 'IN': 'IND', 'US': 'USA', 'CN': 'CHN' };
+  const isoSearch = isoMap[iso2] || iso2; 
 
   // SSRF guard: strictly validate to exactly 2 uppercase letters
   if (!/^[A-Z]{2}$/.test(iso2)) {
@@ -174,7 +176,7 @@ router.get('/boundaries/:iso2', async (req, res) => {
 
   try {
     const { data: meta } = await axios.get(
-      `https://www.geoboundaries.org/api/current/gbOpen/${iso2}/ADM0/`,
+      `https://www.geoboundaries.org/api/current/gbOpen/${isoSearch}/ADM0/`,
       { timeout: 7000 }
     ).catch(() => ({ data: null }));
 

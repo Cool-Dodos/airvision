@@ -7,7 +7,7 @@ import indiaGeoJson from '../data/india-official.json';
 
 const WORLD_URL   = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 const INDIA_ID    = 356;
-const LABEL_SCALE = 1.6; // show labels when zoom ≥ 1.6× base scale
+const LABEL_SCALE = 1.6;
 
 export default function Globe({ aqiData, onCountryClick }) {
   const svgRef   = useRef(null);
@@ -56,13 +56,11 @@ export default function Globe({ aqiData, onCountryClick }) {
       gGrat.attr('d', pathGen);
       gCountries?.selectAll('path').attr('d', pathGen);
       gMesh?.attr('d', pathGen);
-      // Reposition labels if visible
       if (scale >= BASE * LABEL_SCALE && gLabels) {
         gLabels.selectAll('text').each(function(d) {
           const c     = d3.geoCentroid(d);
           const proj  = projection(c);
           if (!proj) { d3.select(this).style('display', 'none'); return; }
-          // Hide if centroid is on the back of the globe
           const angle = d3.geoDistance(c, [-projection.rotate()[0], -projection.rotate()[1]]);
           d3.select(this)
             .style('display', angle > Math.PI / 2 ? 'none' : 'block')
@@ -73,7 +71,6 @@ export default function Globe({ aqiData, onCountryClick }) {
 
     d3.json(WORLD_URL).then(world => {
       let features = topojson.feature(world, world.objects.countries).features;
-      // Override India with official boundary
       features = features.map(f => f.id === INDIA_ID ? { ...f, geometry: indiaGeoJson.geometry } : f);
 
       gCountries = svg.append('g');
@@ -113,7 +110,7 @@ export default function Globe({ aqiData, onCountryClick }) {
           setTimeout(() => { stateRef.current.autoRotate = true; }, 8000);
         });
 
-      // Country name labels (visible only when zoomed in)
+      // Country name labels 
       gLabels = svg.append('g').attr('class', 'labels').style('pointer-events', 'none');
       gLabels.selectAll('text')
         .data(features).join('text')
@@ -163,7 +160,6 @@ export default function Globe({ aqiData, onCountryClick }) {
       .on('end', () => setTimeout(() => { stateRef.current.autoRotate = true; }, 3000))
     );
 
-    // Scroll zoom — show labels when zoomed in enough
     svg.on('wheel', event => {
       event.preventDefault();
       scale = Math.max(BASE * 0.5, Math.min(BASE * 4, scale - event.deltaY * 1.2));
@@ -181,7 +177,7 @@ export default function Globe({ aqiData, onCountryClick }) {
     return () => svg.selectAll('*').remove();
   }, [aqiData, getColor]);
 
-  // Reactive color update
+
   useEffect(() => {
     if (!svgRef.current) return;
     d3.select(svgRef.current).selectAll('.cp')

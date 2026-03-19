@@ -1,7 +1,7 @@
 import {
   Component, OnDestroy, OnChanges, SimpleChanges, HostListener,
   ElementRef, ViewChild, Input, Output, EventEmitter,
-  ChangeDetectionStrategy, NgZone, AfterViewInit
+  ChangeDetectionStrategy, NgZone, AfterViewInit, ChangeDetectorRef
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { CommonModule } from '@angular/common';
@@ -11,17 +11,17 @@ import * as topojson from 'topojson-client';
 import { aqiInfo, NUMERIC_TO_CODE } from '../../utils/aqi';
 import { safeOutdoorTime, SOURCE_TAGS } from '../../utils/health';
 
-const WORLD_50M        = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json';
-const INDIA_ID         = 356;
-const LABEL_SCALE      = 1.6;
-const INDIA_ENTER_MULT = 2.8;
-const INDIA_EXIT_MULT  = 2.0;
+const WORLD_50M = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json';
+const INDIA_ID = 356;
+const LABEL_SCALE = 1.6;
+const INDIA_ENTER_MULT = 2.2; // auto-trigger state mode earlier
+const INDIA_EXIT_MULT = 2.0;
 const INDIA_CENTROID: [number, number] = [82.8, 21.7];
 const HALF_PI = Math.PI / 2;
-const OCEAN_COLOR    = '#040c1e';
-const NO_DATA_COLOR  = '#14253d';
+const OCEAN_COLOR = '#040c1e';
+const NO_DATA_COLOR = '#14253d';
 const NO_DATA_STROKE = '#1e3250';
-const GRAT_COLOR     = '#091520';
+const GRAT_COLOR = '#091520';
 const SPHERE_STROKE = '#0a1e3a';
 
 function codeFromId(id: number | string): string | undefined {
@@ -94,10 +94,10 @@ async function loadIndiaStateAqi(): Promise<Record<string, any>> {
   }
   try {
     const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 12000);
+    const id = setTimeout(() => controller.abort(), 30000);
     const json = await fetch('/api/aqi/india/states', { signal: controller.signal }).then(r => r.json());
     clearTimeout(id);
-    if (json.ok) {
+    if (json.states) {
       indiaStateAqiCached = json.states;
       indiaStateAqiCachedAt = now;
     }
@@ -128,14 +128,14 @@ async function loadIndiaStateAqi(): Promise<Record<string, any>> {
     <span class="tt-cat" [style.color]="tooltip.col">{{tooltip.cat}}</span>
   </div>
   <div *ngIf="tooltip.aqi!==null" class="tt-safe">Safe outdoors: <span>{{tooltip.safe}}</span></div>
-  <div *ngIf="tooltip.src" class="tt-src">{{tooltip.src.tag}}</div>
+  <div *ngIf="tooltip.src" class="tt-src">{{tooltip.src}}</div>
   <div *ngIf="tooltip.aqi===null" class="tt-nodata">No monitoring station data</div>
 </div>
 <div *ngIf="loadingBoundary" class="boundary-badge">Loading boundary...</div>
 <div *ngIf="indiaMode" class="india-badge">India — State View <span class="india-hint">zoom out to exit</span></div>
   `,
   styles: [`
-.tooltip{position:fixed;background:rgba(2,5,16,.96);border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:12px 16px;font-size:12px;pointer-events:none;z-index:300;font-family:'Courier New',monospace;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,0.5);display:flex;flex-direction:column;gap:4px;backdrop-filter:blur(8px)}
+.tooltip{position:fixed;background:rgba(2,5,16,.96);border:1px solid rgba(255,255,255,0.08);border-radius:4px;padding:12px 16px;font-size:12px;pointer-events:none;z-index:300;font-family:'Courier New',monospace;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,0.5);display:flex;flex-direction:column;gap:4px;will-change:transform}
 .health-bar{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:4px 0 0 4px}
 .tt-name{color:#c8d8f0;font-weight:bold;margin-bottom:2px;letter-spacing:.06em;font-size:13px}
 .tt-aqi-row{display:flex;align-items:baseline;gap:6px;margin-bottom:4px}
@@ -164,13 +164,17 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     const canvas = this.canvasRef?.nativeElement;
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    const w   = canvas.offsetWidth;
-    const h   = canvas.offsetHeight;
-    canvas.width  = w * dpr;
+    const w = canvas.offsetWidth;
+    const h = canvas.offsetHeight;
+    canvas.width = w * dpr;
     canvas.height = h * dpr;
     this.ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.windowWidth = w;
     this.W = w; this.H = h;
+    if (this.pickCanvas) {
+      this.pickCanvas.width = w;
+      this.pickCanvas.height = h;
+    }
     if (this.proj) {
       this.proj.translate([w / 2, h / 2]).scale(Math.min(w, h) / 2.1);
       this.scale = this.proj.scale();
@@ -181,27 +185,27 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** Keyboard navigation for accessibility (arrow keys rotate, +/- zoom) */
   onKeydown(event: KeyboardEvent): void {
     const ROTATE_STEP = 5;
-    const ZOOM_STEP   = 30;
+    const ZOOM_STEP = 30;
     if (!this.proj) return;
     const r = this.proj.rotate();
     switch (event.key) {
-      case 'ArrowLeft':  this.proj.rotate([r[0] - ROTATE_STEP, r[1], r[2]]); this.dirty = true; break;
+      case 'ArrowLeft': this.proj.rotate([r[0] - ROTATE_STEP, r[1], r[2]]); this.dirty = true; break;
       case 'ArrowRight': this.proj.rotate([r[0] + ROTATE_STEP, r[1], r[2]]); this.dirty = true; break;
-      case 'ArrowUp':    this.proj.rotate([r[0], Math.max(-90, r[1] - ROTATE_STEP), r[2]]); this.dirty = true; break;
-      case 'ArrowDown':  this.proj.rotate([r[0], Math.min(90,  r[1] + ROTATE_STEP), r[2]]); this.dirty = true; break;
+      case 'ArrowUp': this.proj.rotate([r[0], Math.max(-90, r[1] - ROTATE_STEP), r[2]]); this.dirty = true; break;
+      case 'ArrowDown': this.proj.rotate([r[0], Math.min(90, r[1] + ROTATE_STEP), r[2]]); this.dirty = true; break;
       case '+': case '=': { const s = this.proj.scale(); this.proj.scale(Math.min(800, s + ZOOM_STEP)); this.dirty = true; break; }
-      case '-':           { const s = this.proj.scale(); this.proj.scale(Math.max(100, s - ZOOM_STEP)); this.dirty = true; break; }
+      case '-': { const s = this.proj.scale(); this.proj.scale(Math.max(100, s - ZOOM_STEP)); this.dirty = true; break; }
     }
-    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)) event.preventDefault();
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) event.preventDefault();
   }
   @Output() countryClick = new EventEmitter<string>();
-  @Output() stateClick   = new EventEmitter<{ name: string; aqi: number | null; col: string; cat: string; safe: string }>();
+  @Output() stateClick = new EventEmitter<{ name: string; aqi: number | null; col: string; cat: string; safe: string; station?: string }>();
   @Output() indiaModeChange = new EventEmitter<boolean>();
 
-  tooltip: { x: number; y: number; name: string; aqi: number | null; col: string; cat: string; safe: string; src?: any } | null = null;
+  tooltip: { x: number; y: number; name: string; aqi: number | null; col: string; cat: string; safe: string; src?: string } | null = null;
   loadingBoundary = false;
-  indiaMode       = false;
-  windowWidth     = window.innerWidth;
+  indiaMode = false;
+  windowWidth = window.innerWidth;
 
   @Input() viewMode: 'aqi' | 'pm25' | 'pm10' | 'o3' | 'no2' | 'so2' | 'co' = 'aqi';
 
@@ -212,26 +216,26 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   private grat!: any;
   private sphere = { type: 'Sphere' } as any;
 
-  private worldFeatures:  any[] = [];
-  private indiaFeatures:  any[] = [];
-  private indiaGeometry:  any | null = null;
-  private stateAqi:       Record<string, any> = {};
-  private highlightFeat:  any | null = null;
-  private highlightCol  = '#2a5a8a';
-  private hoveredId:      number | string | null = null;
-  private hoveredState:   string | null = null;
+  private worldFeatures: any[] = [];
+  private indiaFeatures: any[] = [];
+  private indiaGeometry: any | null = null;
+  private stateAqi: Record<string, any> = {};
+  private highlightFeat: any | null = null;
+  private highlightCol = '#2a5a8a';
+  private hoveredId: number | string | null = null;
+  private hoveredState: string | null = null;
 
   private neighborFeatures: Map<string, any> = new Map();
   private onMouseMove?: (e: MouseEvent) => void;
-  private onMouseUp?:   (e: MouseEvent) => void;
+  private onMouseUp?: (e: MouseEvent) => void;
 
-  private BASE  = 0;
+  private BASE = 0;
   private scale = 0;
   private autoRot = true;
-  private ready   = false;
-  private rafId   = 0;
-  private stop?:  () => void;
-  private dirty   = true;
+  private ready = false;
+  private rafId = 0;
+  private stop?: () => void;
+  private dirty = true;
   private indiaStatesLoading = false; // Race condition lock for India mode
 
   readonly legNote = 'AQI values are representative of the average of multiple sensors across each region.';
@@ -240,17 +244,22 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   private lastMouseY = 0;
   private mouseRafPending = false;
 
-  constructor(private zone: NgZone, private aqiSvc: AqiService) {}
+  // Offscreen pick canvas — O(1) hover detection via unique-color fill
+  private pickCanvas!: HTMLCanvasElement;
+  private pickCtx!: CanvasRenderingContext2D;
+  private pickPath!: d3.GeoPath;
+
+  constructor(private zone: NgZone, private aqiSvc: AqiService, private cdr: ChangeDetectorRef) { }
 
   ngAfterViewInit(): void { this.zone.runOutsideAngular(() => this.build()); }
   ngOnChanges(c: SimpleChanges): void {
     if ((c['aqiData'] || c['viewMode']) && this.ready) this.dirty = true;
   }
-  ngOnDestroy(): void { 
-    this.stop?.(); 
-    cancelAnimationFrame(this.rafId); 
+  ngOnDestroy(): void {
+    this.stop?.();
+    cancelAnimationFrame(this.rafId);
     if (this.onMouseMove) window.removeEventListener('mousemove', this.onMouseMove);
-    if (this.onMouseUp)   window.removeEventListener('mouseup',   this.onMouseUp);
+    if (this.onMouseUp) window.removeEventListener('mouseup', this.onMouseUp);
   }
 
   private build(): void {
@@ -258,12 +267,12 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.W = window.innerWidth;
     this.H = window.innerHeight - 38;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width  = this.W * dpr;
+    canvas.width = this.W * dpr;
     canvas.height = this.H * dpr;
     this.ctx = canvas.getContext('2d')!;
     this.ctx.scale(dpr, dpr);
 
-    this.BASE  = Math.min(this.W, this.H) * 0.42;
+    this.BASE = Math.min(this.W, this.H) * 0.42;
     this.scale = this.BASE;
 
     this.proj = d3.geoOrthographic()
@@ -272,19 +281,42 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.path = d3.geoPath().projection(this.proj).context(this.ctx);
     this.grat = d3.geoGraticule()();
 
+    // Offscreen pick canvas for O(1) hover detection
+    this.pickCanvas = document.createElement('canvas');
+    this.pickCanvas.width = this.W;
+    this.pickCanvas.height = this.H;
+    this.pickCtx = this.pickCanvas.getContext('2d', { willReadFrequently: true })!;
+    this.pickPath = d3.geoPath().projection(this.proj).context(this.pickCtx);
+
     loadIndiaStatesGeo();
     loadIndiaStateAqi();
 
     Promise.all([
       d3.json(WORLD_50M),
       fetch('assets/india-official.json').then(r => r.json()),
-    ]).then(([world, india]: [any, any]) => {
+      fetch('/api/aqi/boundaries/AF').then(r => r.json()).catch(() => null),
+    ]).then(([world, india, afghanistan]: [any, any, any]) => {
       this.indiaGeometry = india.geometry;
-      officialIndiaGeo   = india.geometry;
+      officialIndiaGeo = india.geometry;
       let features = (topojson.feature(world, world.objects.countries) as any).features;
-      features = features.map((f: any) =>
-        String(f.id) === String(INDIA_ID) ? { ...f, geometry: india.geometry } : f
-      );
+      features = features.map((f: any) => {
+        if (String(f.id) === String(INDIA_ID)) return { ...f, geometry: india.geometry };
+        if (Number(f.id) === 4 && afghanistan?.geometry) {
+          // AFG GeoBoundaries source is often inverted (covers whole sphere). Fix if area > 2*PI.
+          if (d3.geoArea(afghanistan) > 6) {
+            console.log('[GLOBE] AF geometry inverted, fixing winding...');
+            if (afghanistan.geometry.type === 'Polygon') {
+              afghanistan.geometry.coordinates.forEach((ring: any) => ring.reverse());
+            } else if (afghanistan.geometry.type === 'MultiPolygon') {
+              afghanistan.geometry.coordinates.forEach((poly: any) => {
+                poly.forEach((ring: any) => ring.reverse());
+              });
+            }
+          }
+          return { ...f, geometry: afghanistan.geometry };
+        }
+        return f;
+      });
       this.worldFeatures = features;
       this.precomputeNeighborClips(features);
       this.ready = true;
@@ -298,12 +330,13 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
         }
         if (this.dirty) {
           this.draw();
+          // Skip drawPick here — we'll do it JIT in handleHover to save CPU
           this.dirty = false;
         }
         this.rafId = requestAnimationFrame(loop);
       };
       this.rafId = requestAnimationFrame(loop);
-      this.stop  = () => cancelAnimationFrame(this.rafId);
+      this.stop = () => cancelAnimationFrame(this.rafId);
     });
 
     // Click
@@ -319,12 +352,19 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
           const info = aqiInfo(data?.aqi);
           const safe = safeOutdoorTime(data?.aqi ?? undefined);
           this.zone.run(() => {
-            this.stateClick.emit({ name: rawName, aqi: data?.aqi ?? null, col: info.col, cat: info.cat, safe: safe.healthy });
+            this.stateClick.emit({ name: rawName, aqi: data?.aqi ?? null, col: info.col, cat: info.cat, safe: safe.healthy, station: data?.city });
           });
           return;
         }
       }
+
       const feat = this.worldFeatures.find(f => d3.geoContains(f, geo));
+
+      // Auto-trigger India mode on click if zoomed or close enough
+      if (feat && String(feat.id) === String(INDIA_ID)) {
+        this.zone.run(() => this.triggerIndiaMode());
+        return;
+      }
       if (!feat) {
         this.zone.run(() => {
           this.selectedCode = null;
@@ -340,7 +380,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       this.rotateToFeature(feat);
       this.loadHighlightBoundary(code, feat);
       if (code === 'IN') { this.zone.run(() => this.triggerIndiaMode()); }
-      else               { this.zone.run(() => this.exitIndiaMode()); }
+      else { this.zone.run(() => this.exitIndiaMode()); }
       this.zone.run(() => this.countryClick.emit(code));
     });
 
@@ -354,14 +394,16 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     });
     canvas.addEventListener('mouseleave', () => {
       this.hoveredId = null; this.hoveredState = null;
-      this.zone.run(() => { this.tooltip = null; }); this.dirty = true;
+      this.tooltip = null;
+      this.cdr.detectChanges();
+      this.dirty = true;
     });
 
     // Drag
-    let dragOrigin: { x: number; y: number; rot: [number,number,number] } | null = null;
+    let dragOrigin: { x: number; y: number; rot: [number, number, number] } | null = null;
     canvas.addEventListener('mousedown', (e: MouseEvent) => {
       this.autoRot = false;
-      dragOrigin = { x: e.clientX, y: e.clientY, rot: [...this.proj.rotate()] as [number,number,number] };
+      dragOrigin = { x: e.clientX, y: e.clientY, rot: [...this.proj.rotate()] as [number, number, number] };
     });
     const onMove = (e: MouseEvent) => {
       if (!dragOrigin) return;
@@ -378,9 +420,9 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       setTimeout(() => { this.autoRot = true; }, 3000);
     };
     this.onMouseMove = onMove;
-    this.onMouseUp   = onUp;
+    this.onMouseUp = onUp;
     window.addEventListener('mousemove', this.onMouseMove);
-    window.addEventListener('mouseup',   this.onMouseUp);
+    window.addEventListener('mouseup', this.onMouseUp);
 
     // Scroll
     canvas.addEventListener('wheel', (e: WheelEvent) => {
@@ -423,7 +465,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       } else if (e.touches.length === 2) {
         const dx = e.touches[0].clientX - e.touches[1].clientX;
         const dy = e.touches[0].clientY - e.touches[1].clientY;
-        const dist  = Math.hypot(dx, dy);
+        const dist = Math.hypot(dx, dy);
         const delta = dist - lastPinchDist;
         lastPinchDist = dist;
         const s = this.proj.scale();
@@ -441,7 +483,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   private draw(): void {
     if (!this.ctx) return;
-    const ctx  = this.ctx;
+    const ctx = this.ctx;
     const path = this.path;
     ctx.clearRect(0, 0, this.W, this.H);
 
@@ -467,18 +509,18 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     const showLabels = this.scale >= this.BASE * LABEL_SCALE;
     for (const feat of this.worldFeatures) {
       if (String(feat.id) === String(INDIA_ID)) continue; // Always skip India in default loop
-      
-      const code    = codeFromId(feat.id);
-      const data    = code ? this.aqiData[code] : null;
-      let val       = null;
+
+      const code = codeFromId(feat.id);
+      const data = code ? this.aqiData[code] : null;
+      let val = null;
       if (data) {
         if (this.viewMode === 'aqi') val = data.avgAqi;
         else val = data.iaqi?.[this.viewMode] ?? null;
       }
-      
+
       const hasData = val != null;
-      const isHov   = this.hoveredId === feat.id;
-      
+      const isHov = this.hoveredId === feat.id;
+
       // Determine fill color with fallback for missing specific pollutants
       let fill = NO_DATA_COLOR;
       if (hasData) {
@@ -495,7 +537,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
         ctx.beginPath(); path(feat); ctx.clip();
         ctx.beginPath(); path(this.sphere);
         path({ type: 'Feature', properties: {}, geometry: this.indiaGeometry });
-        ctx.clip('evenodd'); 
+        ctx.clip('evenodd');
         ctx.fillStyle = fill;
         ctx.globalAlpha = (data && data.avgAqi != null) ? (isHov ? 1.0 : 0.82) : 0.85;
         ctx.fill();
@@ -504,9 +546,9 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       }
 
       ctx.beginPath(); path(feat);
-      ctx.fillStyle   = fill;
+      ctx.fillStyle = fill;
       ctx.globalAlpha = (data && data.avgAqi != null) ? (isHov ? 1.0 : 0.82) : 0.85;
-      ctx.fill(); 
+      ctx.fill();
       ctx.globalAlpha = 1;
       // Borders drawn in unified pass below
     }
@@ -516,10 +558,10 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     // Draw country fill if not in state mode OR if states haven't loaded yet
     if (indiaFeat && (!this.indiaMode || !this.indiaFeatures.length)) {
       const data = this.aqiData['IN'];
-      const val  = (this.viewMode === 'aqi') ? data?.avgAqi : (data?.iaqi?.[this.viewMode] ?? null);
+      const val = (this.viewMode === 'aqi') ? data?.avgAqi : (data?.iaqi?.[this.viewMode] ?? null);
       const info = aqiInfo(val);
       const isHov = this.hoveredId === indiaFeat.id;
-      
+
       ctx.beginPath(); path(indiaFeat);
       ctx.fillStyle = val != null ? info.col : NO_DATA_COLOR;
       ctx.globalAlpha = isHov ? 1.0 : 0.95;
@@ -535,9 +577,10 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
         ctx.fillStyle = NO_DATA_COLOR; ctx.fill();
       }
       for (const feat of this.indiaFeatures) {
-        const name  = feat.properties?.shapeName || feat.properties?.name || '';
-        const data  = this.stateAqi[name];
-        const fill  = data ? aqiInfo(data.aqi).col : NO_DATA_COLOR;
+        const name = feat.properties?.shapeName || feat.properties?.name || '';
+        const norm = this.normalizeStateName(name);
+        const data = this.stateAqi[norm] || this.stateAqi[name];
+        const fill = data ? aqiInfo(data.aqi).col : NO_DATA_COLOR;
         const isHov = this.hoveredState === name;
         ctx.beginPath(); path(feat);
         ctx.fillStyle = fill; ctx.globalAlpha = isHov ? 1.0 : 0.95; ctx.fill(); ctx.globalAlpha = 1;
@@ -554,23 +597,34 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
           const p = this.proj(centroid); if (!p) continue;
           // Approximate area from projected bounds
           const b = (this.path as any).bounds(feat);
-          const area = Math.abs((b[1][0]-b[0][0])*(b[1][1]-b[0][1]));
+          const area = Math.abs((b[1][0] - b[0][0]) * (b[1][1] - b[0][1]));
           if (area < 120) continue;
           const label = area < 1000 ? (STATE_ABBR[name] || name) : name;
-          const fs = Math.max(7, Math.min(13, Math.sqrt(area) * 0.06));
-          ctx.font = `bold ${fs}px 'Courier New', monospace`;
-          
-          const metrics = ctx.measureText(label);
+          const stateData = this.stateAqi[this.normalizeStateName(name)] || this.stateAqi[name];
+          const overrides: Record<string, string> = {
+            'Uttranchal': 'Uttarakhand',
+            'Uttaranchal': 'Uttarakhand',
+            'Uttranchal ': 'Uttarakhand',
+            'Uttaranchal ': 'Uttarakhand',
+            'Uttarakhand': 'Uttarakhand',
+            'Orissa': 'Odisha',
+            'Orissa ': 'Odisha',
+            'Orrisa': 'Odisha',
+            'Orrisam': 'Odisha',
+            'Odisha': 'Odisha'
+          };
+          const cleanLabel = overrides[label] || overrides[name] || label;
+          const metrics = ctx.measureText(cleanLabel);
           const lw = metrics.width + 4;
-          const lh = fs + 4;
-          if (checkOverlap(p[0]-lw/2, p[1]-lh/2, lw, lh)) continue;
+          const lh = 11 + 4;
+          if (checkOverlap(p[0] - lw / 2, p[1] - lh / 2, lw, lh)) continue;
 
-          ctx.shadowColor = '#020510'; ctx.shadowBlur = 4;
-          ctx.fillStyle = this.stateAqi[name] ? '#ffffff' : '#8ab0c8';
-          ctx.fillText(label, p[0], p[1]);
-          ctx.shadowBlur = 0;
-          
-          renderedLabels.push({ x: p[0]-lw/2, y: p[1]-lh/2, w: lw, h: lh });
+          ctx.font = `11px 'Courier New', monospace`;
+          ctx.strokeStyle = '#020510'; ctx.lineWidth = 2.5; ctx.strokeText(cleanLabel, p[0], p[1]);
+          ctx.fillStyle = stateData ? '#ffffff' : '#8ab0c8';
+          ctx.fillText(cleanLabel, p[0], p[1]);
+
+          renderedLabels.push({ x: p[0] - lw / 2, y: p[1] - lh / 2, w: lw, h: lh });
         }
       }
     }
@@ -580,7 +634,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     if (showLabels) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.font = "10px 'Courier New', monospace";
-      
+
       // Sort features by importance (e.g., population/area or just fixed list)
       // For now, let's just prioritize countries with higher AQI or specific ones
       const sortedFeatures = [...this.worldFeatures].sort((a: any, b: any) => {
@@ -593,26 +647,26 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
         if (String(feat.id) === String(INDIA_ID)) continue; // Always skip India in default loop
         const code = codeFromId(feat.id);
         if (!code || !this.aqiData[code]) continue;
-        
+
         const centroid = d3.geoCentroid(feat) as [number, number];
         const angle = d3.geoDistance(centroid, [-this.proj.rotate()[0], -this.proj.rotate()[1]]);
         if (angle >= HALF_PI) continue;
-        
+
         const p = this.proj(centroid); if (!p) continue;
-        
+
         const name = this.aqiData[code].name || code;
         const metrics = ctx.measureText(name);
         const lw = metrics.width + 10;
         const lh = 14;
-        
-        if (checkOverlap(p[0] - lw/2, p[1] - lh/2, lw, lh)) continue;
-        
+
+        if (checkOverlap(p[0] - lw / 2, p[1] - lh / 2, lw, lh)) continue;
+
         ctx.shadowColor = '#020510'; ctx.shadowBlur = 6;
-        ctx.fillStyle   = this.hoveredId === feat.id ? '#ffffff' : '#c8d8f0';
+        ctx.fillStyle = this.hoveredId === feat.id ? '#ffffff' : '#c8d8f0';
         ctx.fillText(name, p[0], p[1]);
-        ctx.shadowBlur  = 0;
-        
-        renderedLabels.push({ x: p[0] - lw/2, y: p[1] - lh/2, w: lw, h: lh });
+        ctx.shadowBlur = 0;
+
+        renderedLabels.push({ x: p[0] - lw / 2, y: p[1] - lh / 2, w: lw, h: lh });
       }
     }
 
@@ -647,7 +701,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       ctx.beginPath(); this.path(feat);
       const isHov = this.hoveredId === feat.id;
       ctx.strokeStyle = isHov ? 'rgba(255,255,255,0.35)' : '#020510';
-      ctx.lineWidth   = isHov ? 1.2 : 0.4;
+      ctx.lineWidth = isHov ? 1.2 : 0.4;
       ctx.stroke();
     }
 
@@ -658,47 +712,99 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
         const name = feat.properties?.shapeName || feat.properties?.name || '';
         const isHov = this.hoveredState === name;
         ctx.strokeStyle = isHov ? 'rgba(255,255,255,0.35)' : '#020510';
-        ctx.lineWidth   = isHov ? 1.2 : 0.45;
+        ctx.lineWidth = isHov ? 1.2 : 0.45;
         ctx.stroke();
       }
     }
   }
 
+  // ─── Offscreen pick canvas: unique-RGB per feature for O(1) hover ─────────
+  // World features: r=0, id = g*256+b  (ISO numeric codes 1–999)
+  // India states:   r=1, b = stateIndex
+  // Ocean/outside:  r=0, g=0, b=0  (id=0 is never a valid country)
+  private drawPick(): void {
+    const ctx = this.pickCtx;
+    const path = this.pickPath;
+    ctx.clearRect(0, 0, this.W, this.H);
+
+    // Background sphere = black (ocean)
+    ctx.beginPath(); path(this.sphere);
+    ctx.fillStyle = '#000000'; ctx.fill();
+
+    if (this.indiaMode && this.indiaFeatures.length) {
+      // India state mode: each state → r=1, b=index
+      for (let i = 0; i < this.indiaFeatures.length; i++) {
+        ctx.beginPath(); path(this.indiaFeatures[i]);
+        ctx.fillStyle = `rgb(1,0,${i})`; ctx.fill();
+      }
+    } else {
+      // World mode: encode numeric country id as g*256+b
+      for (const feat of this.worldFeatures) {
+        const id = Number(feat.id);
+        if (!id) continue;
+        ctx.beginPath(); path(feat);
+        ctx.fillStyle = `rgb(0,${Math.floor(id / 256)},${id % 256})`; ctx.fill();
+      }
+    }
+  }
 
   private handleHover(clientX: number, clientY: number): void {
+    if (!this.ready) return;
+
+    // If globe rotated/zoomed since last hover, we MUST update the pick buffer first
+    if (this.dirty) {
+      this.draw();
+      this.drawPick();
+      this.dirty = false;
+    }
+
     const canvas = this.canvasRef.nativeElement;
-    const rect   = canvas.getBoundingClientRect();
-    const geo    = this.proj.invert!([clientX - rect.left, clientY - rect.top]);
-    if (!geo) {
+    const rect = canvas.getBoundingClientRect();
+    const lx = Math.round(clientX - rect.left);
+    const ly = Math.round(clientY - rect.top);
+
+    // O(1) pick via offscreen canvas — one pixel read identifies the feature
+    if (lx < 0 || ly < 0 || lx >= this.W || ly >= this.H) return;
+    const [r, g, b] = this.pickCtx.getImageData(lx, ly, 1, 1).data;
+
+    // ── Ocean / outside globe ────────────────────────────────────────────────
+    if (r === 0 && g === 0 && b === 0) {
       if (this.hoveredId !== null || this.hoveredState !== null) {
         this.hoveredId = null; this.hoveredState = null;
-        this.zone.run(() => { this.tooltip = null; }); this.dirty = true;
+        this.tooltip = null;
+        this.cdr.detectChanges(); this.dirty = true;
       }
       return;
     }
-    if (this.indiaMode && this.indiaFeatures.length) {
-      const state = this.indiaFeatures.find(f => d3.geoContains(f, geo));
-      if (state) {
-        const rawName  = state.properties?.shapeName || state.properties?.name || '';
-        const normName = this.normalizeStateName(rawName);
-        if (this.hoveredState !== rawName) {
-          this.hoveredState = rawName; this.hoveredId = null;
-          const data = this.stateAqi[normName] || this.stateAqi[rawName];
-          const info = aqiInfo(data?.aqi);
-          const safe = safeOutdoorTime(data?.aqi ?? undefined);
-          this.zone.run(() => { this.tooltip = { x: clientX, y: clientY, name: rawName, aqi: data?.aqi ?? null, col: info.col, cat: info.cat, safe: safe.healthy }; });
-          this.dirty = true;
-        } else if (this.tooltip) {
-          this.zone.run(() => { this.tooltip = { ...this.tooltip!, x: clientX, y: clientY }; });
-        }
-        return;
+
+    // ── India state (r === 1) ────────────────────────────────────────────────
+    if (r === 1) {
+      const state = this.indiaFeatures[b];
+      if (!state) return;
+      const rawName = state.properties?.shapeName || state.properties?.name || '';
+      const normName = this.normalizeStateName(rawName);
+      if (this.hoveredState !== rawName) {
+        this.hoveredState = rawName; this.hoveredId = null;
+        const data = this.stateAqi[normName] || this.stateAqi[rawName];
+        const info = aqiInfo(data?.aqi);
+        const safe = safeOutdoorTime(data?.aqi ?? undefined);
+        this.tooltip = { x: clientX, y: clientY, name: rawName, aqi: data?.aqi ?? null, col: info.col, cat: info.cat, safe: safe.healthy, src: data?.city };
+        this.cdr.detectChanges(); this.dirty = true;
+      } else if (this.tooltip) {
+        this.tooltip.x = clientX; this.tooltip.y = clientY;
+        this.cdr.detectChanges();
       }
+      return;
     }
-    const feat = this.worldFeatures.find(f => d3.geoContains(f, geo));
+
+    // ── World feature (r === 0, id = g*256+b) ───────────────────────────────
+    const id = g * 256 + b;
+    const feat = this.worldFeatures.find(f => Number(f.id) === id);
     if (!feat) {
       if (this.hoveredId !== null || this.hoveredState !== null) {
         this.hoveredId = null; this.hoveredState = null;
-        this.zone.run(() => { this.tooltip = null; }); this.dirty = true;
+        this.tooltip = null;
+        this.cdr.detectChanges(); this.dirty = true;
       }
       return;
     }
@@ -708,23 +814,23 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       const data = code && this.aqiData[code];
       let val = null;
       if (data) {
-        if (this.viewMode === 'aqi') val = data.avgAqi;
-        else val = data.iaqi?.[this.viewMode] ?? null;
+        val = (this.viewMode === 'aqi') ? data.avgAqi : (data.iaqi?.[this.viewMode] ?? null);
       }
       const info = aqiInfo(val);
       const safe = safeOutdoorTime(val ?? undefined);
-      const src  = data?.dominentpol && SOURCE_TAGS[data.dominentpol];
-      this.zone.run(() => { this.tooltip = { x: clientX, y: clientY, name: data?.name || code || 'Unknown', aqi: val, col: info.col, cat: info.cat, safe: safe.healthy, src }; });
-      this.dirty = true;
+      const src = data?.dominentpol && SOURCE_TAGS[data.dominentpol];
+      this.tooltip = { x: clientX, y: clientY, name: data?.name || code || 'Unknown', aqi: val, col: info.col, cat: info.cat, safe: safe.healthy, src };
+      this.cdr.detectChanges(); this.dirty = true;
     } else if (this.tooltip) {
-      this.zone.run(() => { this.tooltip = { ...this.tooltip!, x: clientX, y: clientY }; });
+      this.tooltip.x = clientX; this.tooltip.y = clientY;
+      this.cdr.detectChanges();
     }
   }
 
   private checkIndiaZoom(): void {
     if (!this.ready) return;
-    const rot    = this.proj.rotate();
-    const angle  = d3.geoDistance(INDIA_CENTROID, [-rot[0], -rot[1]]);
+    const rot = this.proj.rotate();
+    const angle = d3.geoDistance(INDIA_CENTROID, [-rot[0], -rot[1]]);
     const facing = angle < Math.PI * 0.12;
     if (!this.indiaMode && this.scale >= this.BASE * INDIA_ENTER_MULT && facing) {
       this.zone.run(() => this.triggerIndiaMode());
@@ -734,6 +840,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   private async triggerIndiaMode(): Promise<void> {
+    console.log('[GLOBE] Triggering India State Mode...');
     if (this.indiaMode || this.indiaStatesLoading) return;  // race-condition lock
     this.indiaStatesLoading = true;
     try {
@@ -765,16 +872,27 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   /** Normalize state names for consistent stateAqi lookups (handles mixed case, diacritics) */
   private normalizeStateName(name: string): string {
     if (!name) return '';
-    return name.toLowerCase()
+    const n = name.toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, ' ')
       .trim();
+    const aliases: Record<string, string> = {
+      'utranchal': 'uttarakhand',
+      'uttranchal': 'uttarakhand',
+      'uttaranchal': 'uttarakhand',
+      'orissa': 'odisha',
+      'orissam': 'odisha',
+      'orrisa': 'odisha',
+      'puduchcheri': 'puducherry',
+      'pondicherry': 'puducherry'
+    };
+    return aliases[n] || n;
   }
 
   private loadHighlightBoundary(iso2: string, feat: any): void {
     this.highlightFeat = feat;
-    this.highlightCol  = this.aqiData[iso2] ? aqiInfo(this.aqiData[iso2].avgAqi).col : '#2a5a8a';
+    this.highlightCol = this.aqiData[iso2] ? aqiInfo(this.aqiData[iso2].avgAqi).col : '#2a5a8a';
     this.dirty = true;
     this.zone.run(() => { this.loadingBoundary = true; });
     fetchBoundary(iso2).then(f => {
