@@ -52,5 +52,5 @@ AqiSnapshotSchema.index({ fetchedAt: -1 });
 // 25h = 90000 seconds; gives 1h buffer so 24h of data is always available
 AqiSnapshotSchema.index({ fetchedAt: 1 }, { expireAfterSeconds: 90000 });
 
-module.exports = mongoose.model('AqiSnapshot', AqiSnapshotSchema);
+module.exports = mongoose.models.AqiSnapshot || mongoose.model('AqiSnapshot', AqiSnapshotSchema);
 

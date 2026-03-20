@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, ChangeDetectionStrategy, ChangeDetectorRef, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AqiService } from '../../services/aqi.service';
 import { forkJoin, of } from 'rxjs';
@@ -25,8 +25,9 @@ interface CountryDetail {
   styleUrls: ['./info-panel.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class InfoPanelComponent implements OnChanges {
+export class InfoPanelComponent implements OnChanges, OnDestroy {
   @Input() countryCode: string | null = null;
+  @Output() closePanel = new EventEmitter<void>();
   @Output() share = new EventEmitter<any>();
 
   detail: CountryDetail | null = null;

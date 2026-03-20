@@ -8,6 +8,9 @@
       <div class="skeleton sk-table"></div>
       <div class="skeleton sk-chart"></div>
     </div>
+    <div *ngIf="loadingTooLong" style="font-size:10px;color:#3a5a7a;text-align:center;margin-top:8px">
+      Waking up server...
+    </div>
   </ng-container>
 
   <!-- ── Error ─────────────────────────────────────────────────────────── -->
@@ -24,7 +27,7 @@
     <div class="section-hdr hdr-top">
       <div class="actions">
         <span class="share-btn" (click)="setShareData(detail)">SHARE</span>
-        <span (click)="countryCode = null">DISMISS</span>
+        <span (click)="closePanel.emit()">DISMISS</span>
       </div>
       <div class="label">SELECTED REGION</div>
     </div>

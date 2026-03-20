@@ -20,4 +20,4 @@ const CountryDetailSchema = new mongoose.Schema({
 
 CountryDetailSchema.index({ countryCode: 1, fetchedAt: -1 });
 
-module.exports = mongoose.model('CountryDetail', CountryDetailSchema);
+module.exports = mongoose.models.CountryDetail || mongoose.model('CountryDetail', CountryDetailSchema);

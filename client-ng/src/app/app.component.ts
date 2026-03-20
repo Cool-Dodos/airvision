@@ -5,7 +5,6 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 
 import { AqiService } from './services/aqi.service';
-import { GlobeComponent } from './components/globe/globe.component';
 import { GlobeWebglComponent } from './components/globe/globe-webgl.component';
 import { InfoPanelComponent } from './components/info-panel/info-panel.component';
 import { AnomalyFeedComponent } from './components/anomaly-feed/anomaly-feed.component';
@@ -13,13 +12,14 @@ import { ShareCardComponent } from './components/share-card/share-card.component
 import { HistorySliderComponent } from './components/history-slider/history-slider.component';
 import { aqiInfo } from './utils/aqi';
 import { ShareData } from './models/share-data.model';
+import { safeOutdoorTime } from './utils/health';
 
 const REFRESH = 120000; // 2 mins
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, GlobeComponent, GlobeWebglComponent, InfoPanelComponent, AnomalyFeedComponent, ShareCardComponent, HistorySliderComponent],
+  imports: [CommonModule, FormsModule, GlobeWebglComponent, InfoPanelComponent, AnomalyFeedComponent, ShareCardComponent, HistorySliderComponent],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css'],
 })
@@ -121,16 +121,27 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       cat:         this.selectedState.cat,
       col:         this.selectedState.col,
       safe:        this.selectedState.safe,
-      dominentpol: 'pm25',
-      iaqi:        { pm25: this.selectedState.aqi },
+      dominentpol: (this.selectedState as any).dominentpol || 'pm25',
+      iaqi:        (this.selectedState as any).iaqi || { pm25: this.selectedState.aqi },
     };
     this.shareData = shareData;
     console.log('State shared:', this.shareData);
   }
 
-  setShareData(data: any) {
-    console.log('Setting share data:', data);
-    this.shareData = data;
+  setShareData(d: any) {
+    if (!d) return;
+    console.log('Setting share data:', d);
+    const info = aqiInfo(d.avgAqi);
+    this.shareData = {
+      name:        d.countryName,
+      city:        d.city ?? null,
+      aqi:         d.avgAqi,
+      cat:         info.cat,
+      col:         info.col,
+      safe:        safeOutdoorTime(d.avgAqi).healthy,
+      dominentpol: d.dominentpol ?? null,
+      iaqi:        d.iaqi,
+    } as ShareData;
   }
 
   onStateClick(state: any): void {

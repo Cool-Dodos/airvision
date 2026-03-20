@@ -18,4 +18,4 @@ const StateSnapshotSchema = new mongoose.Schema({
 // TTL index to auto-prune state caches after 2 hours (more frequent than world data)
 StateSnapshotSchema.index({ fetchedAt: 1 }, { expireAfterSeconds: 7200 });
 
-module.exports = mongoose.model('StateSnapshot', StateSnapshotSchema);
+module.exports = mongoose.models.StateSnapshot || mongoose.model('StateSnapshot', StateSnapshotSchema);

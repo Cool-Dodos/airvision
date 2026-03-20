@@ -15,4 +15,4 @@ const DailyAverageSchema = new mongoose.Schema({
 
 DailyAverageSchema.index({ countryCode: 1, date: -1 });
 
-module.exports = mongoose.model('DailyAverage', DailyAverageSchema);
+module.exports = mongoose.models.DailyAverage || mongoose.model('DailyAverage', DailyAverageSchema);

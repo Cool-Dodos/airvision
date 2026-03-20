@@ -383,6 +383,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
 
     // DECISION 2: build color cache — aqiData may already be populated from ngOnChanges
     this.rebuildColorCache();
+    this.swapPolygons();
 
     // Polygon layer — all callbacks are O(1) Map lookups
     this.globe
@@ -545,6 +546,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
       };
     } else {
       const code = codeFromNumeric(feat.id);
+      if (!code) return;
       const data = code ? this.aqiData[code] : null;
       const val = data
         ? (this.viewMode === 'aqi' ? data.avgAqi : (data.iaqi?.[this.viewMode] ?? null))
@@ -689,8 +691,9 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
   private swapPolygons(): void {
     if (!this.globe) return;
     if (this.indiaMode) {
-      // Keep all countries except India polygon + overlay state features
-      const withoutIndia = this.worldFeatures.filter(f => codeFromNumeric(f.id) !== 'IN');
+      // Keep all countries except India polygon + overlay state features. Also remove overlapping neighbors
+      const NEIGHBORS = ['IN', 'NP', 'BD', 'MM', 'BT', 'PK', 'AF', 'CN'];
+      const withoutIndia = this.worldFeatures.filter(f => !NEIGHBORS.includes(codeFromNumeric(f.id) || ''));
       this.globe.polygonsData([...withoutIndia, ...this.indiaFeatures]);
     } else {
       this.globe.polygonsData([...this.worldFeatures]);
