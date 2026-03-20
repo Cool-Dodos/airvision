@@ -599,15 +599,12 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (!code) return;
 
     this.selectedKey = this.fkey(feat);
-    this.swapPolygons();
+    // REMOVED this.swapPolygons() to prevent synchronous 3D geometry rebuild freezing the UI.
+    // Let zoomToCode handle the geometry swap AFTER the camera animation finishes.
 
-    if (code === 'IN') {
-      this.zone.run(() => this.enterIndia());
-    } else {
-      // Emit immediately — app.component receives code + pre-loaded aqiData snapshot
-      // so side panel can render current data without waiting for a new fetch
-      this.zone.run(() => this.countryClick.emit(code));
-    }
+    // Emit immediately — app.component receives code + pre-loaded aqiData snapshot
+    // This also triggers ngOnChanges which invokes zoomToCode
+    this.zone.run(() => this.countryClick.emit(code));
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -622,12 +619,12 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
         this.currentLod = 'hi';
         this.worldFeatures = this.worldFeaturesHi;
         this.rebuildColorCache();
-        this.swapPolygons();
+        requestAnimationFrame(() => this.swapPolygons());
       } else if (!wantHi && this.currentLod === 'hi') {
         this.currentLod = 'lo';
         this.worldFeatures = this.worldFeaturesLo;
         this.rebuildColorCache();
-        this.swapPolygons();
+        requestAnimationFrame(() => this.swapPolygons());
       }
     }
 
@@ -720,10 +717,13 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.pauseAutoRotate();
     this.selectedKey = this.fkey(feat);
     this.globe.pointOfView({ lat, lng, altitude: alt }, 900);
-    this.swapPolygons();
 
+    // Defer the heavy geometry rebuild (swapPolygons) until after the camera completes its animation.
+    // This prevents the main thread from freezing and stuttering the zoom effect!
     if (code === 'IN') {
-      setTimeout(() => this.zone.run(() => this.enterIndia()), 950);
+      setTimeout(() => this.zone.run(() => this.enterIndia()), 900);
+    } else {
+      setTimeout(() => this.swapPolygons(), 900);
     }
   }
 
