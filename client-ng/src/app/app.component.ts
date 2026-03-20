@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
 
 import { AqiService } from './services/aqi.service';
 import { GlobeComponent } from './components/globe/globe.component';
+import { GlobeWebglComponent } from './components/globe/globe-webgl.component';
 import { InfoPanelComponent } from './components/info-panel/info-panel.component';
 import { AnomalyFeedComponent } from './components/anomaly-feed/anomaly-feed.component';
 import { ShareCardComponent } from './components/share-card/share-card.component';
@@ -18,7 +19,7 @@ const REFRESH = 120000; // 2 mins
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, GlobeComponent, InfoPanelComponent, AnomalyFeedComponent, ShareCardComponent, HistorySliderComponent],
+  imports: [CommonModule, FormsModule, GlobeComponent, GlobeWebglComponent, InfoPanelComponent, AnomalyFeedComponent, ShareCardComponent, HistorySliderComponent],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css'],
 })
@@ -95,7 +96,11 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   get globalInfo() { return aqiInfo(parseFloat(this.globalAvg)); }
 
-  onCountryClick(code: string): void { 
+  onCountryClick(code: string): void {
+    if (!code) {
+      this.onClose();
+      return;
+    }
     this.selectedState = null;
     this.selectedCode = code;
   }

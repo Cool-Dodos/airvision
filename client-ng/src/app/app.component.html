@@ -8,15 +8,16 @@
 <div *ngIf="error" class="error-banner"><span class="err-icon">ALERT</span> {{ error }}</div>
 
 <!-- Globe -->
-<app-globe
+<app-globe-webgl
   [aqiData]="aqiData"
   [selectedCode]="selectedCode"
   [focusCountry]="focusCountry"
   [viewMode]="viewMode"
+  [showFps]="true"
   (countryClick)="onCountryClick($event)"
   (stateClick)="onStateClick($event)"
   (indiaModeChange)="indiaMode = $event">
-</app-globe>
+</app-globe-webgl>
 
 <!-- Top-left brand -->
 <div class="header">
@@ -82,7 +83,7 @@
       <span class="share-btn" (click)="onStateShare()">Share</span>
       <span class="close" (click)="onClose()">Dismiss</span>
     </div>
-    <div class="sec-label">State Level Data — India (V1.6.0 FINAL)</div>
+    <div class="sec-label">State Level Data — India (V1.7.3 OFFLINE)</div>
   </div>
 
   <div *ngIf="selectedState" class="panel-body">

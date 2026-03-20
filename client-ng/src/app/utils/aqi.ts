@@ -87,7 +87,9 @@ export const CODE_TO_NUMERIC: Record<string, number> = {
   TL: 626, TG: 768, TK: 772, TO: 776, TT: 780, TN: 788, TR: 792, TM: 795, TC: 796,
   TV: 798, UG: 800, UA: 804, AE: 784, GB: 826, US: 840, UM: 581, UY: 858, UZ: 860,
   VU: 548, VE: 862, VN: 704, VG: 92, VI: 850, WF: 876, EH: 732, YE: 887, ZM: 894,
-  ZW: 716, SS: 728
+  ZW: 716, SS: 728,
+  RS: 688, ME: 499, FJ: 242, GG: 832, JE: 831, IM: 833, CW: 531, SX: 534,
+  MF: 663, BL: 652, PF: 258, TF: 260, AX: 248, FO: 234, GS: 239, FK: 238
 };
 
 export const NUMERIC_TO_CODE: Record<string, string> = Object.fromEntries(

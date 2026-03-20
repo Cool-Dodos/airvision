@@ -1,0 +1,786 @@
+import {
+  Component, OnDestroy, OnChanges, SimpleChanges,
+  ElementRef, ViewChild, Input, Output, EventEmitter,
+  ChangeDetectionStrategy, NgZone, AfterViewInit, ChangeDetectorRef
+} from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { aqiInfo, NUMERIC_TO_CODE } from '../../utils/aqi';
+import { safeOutdoorTime, SOURCE_TAGS } from '../../utils/health';
+import Globe from 'globe.gl';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+// LOD: 110m at globe scale for 60fps, swap to 50m when zoomed in for real borders
+const WORLD_URL_LO = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
+const WORLD_URL_HI = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json';
+const LOD_SWITCH_ALT = 1.8; // altitude threshold — below this zoom uses 50m
+const NO_DATA_COLOR = 'rgba(40,70,120,0.92)';
+const OCEAN_COLOR = '#040c1e';
+const STROKE_DEFAULT = 'rgba(2,5,16,0.8)';
+const STROKE_ACTIVE = 'rgba(255,255,255,0.4)';
+const SIDE_COLOR = 'rgba(8,18,36,0.6)';
+const MAX_PIXEL_RATIO = 1.5;   // DECISION 3: cap retina pixel ratio — halves GPU load on 2x/3x DPR screens
+const ALT_DEFAULT = 0.005;
+const ALT_HOVER = 0.04;
+const ALT_SELECTED = 0.08;
+
+// India zoom thresholds
+const INDIA_BOUNDS = { latMin: 6, latMax: 38, lngMin: 67, lngMax: 98 };
+const INDIA_ENTER_ALT = 1.3;
+const INDIA_EXIT_ALT = 1.6;
+const INDIA_AQI_TTL = 30 * 60 * 1000; // 30 min cache
+
+// State name normalization (matches Canvas version)
+const STATE_ALIASES: Record<string, string> = {
+  'utranchal': 'uttarakhand', 'uttranchal': 'uttarakhand',
+  'uttaranchal': 'uttarakhand', 'orissa': 'odisha',
+  'orissam': 'odisha', 'orrisa': 'odisha',
+  'puduchcheri': 'puducherry', 'pondicherry': 'puducherry',
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function normalizeState(name: string): string {
+  if (!name) return '';
+  const n = name.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ').trim();
+  return STATE_ALIASES[n] ?? n;
+}
+
+function codeFromNumeric(id: string | number): string | undefined {
+  return NUMERIC_TO_CODE[String(id)];
+}
+
+function isOverIndia(lat: number, lng: number): boolean {
+  return lat > INDIA_BOUNDS.latMin && lat < INDIA_BOUNDS.latMax
+    && lng > INDIA_BOUNDS.lngMin && lng < INDIA_BOUNDS.lngMax;
+}
+
+function flatCoords(geometry: any): number[][] {
+  const out: number[][] = [];
+  const dig = (a: any) => {
+    if (!Array.isArray(a)) return;
+    if (typeof a[0] === 'number') { out.push(a as number[]); return; }
+    a.forEach(dig);
+  };
+  dig(geometry?.coordinates ?? []);
+  return out;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+@Component({
+  selector: 'app-globe-webgl',
+  standalone: true,
+  imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <!-- Star field — sits behind everything, z-index 0 -->
+    <canvas #stars style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none"></canvas>
+
+    <!-- Globe mount -->
+    <div #mount
+      style="position:fixed;top:0;left:0;width:100%;height:calc(100% - 38px);z-index:1;cursor:crosshair"
+      role="img"
+      aria-label="Interactive WebGL globe showing real-time air quality"
+      tabindex="0">
+    </div>
+
+    <!-- Tooltip — CSS transform only, no layout-triggering style writes -->
+    <div *ngIf="tooltip" class="gl-tooltip" [style.transform]="tooltipXform">
+      <div class="gl-tt-bar"   [style.background]="tooltip.col"></div>
+      <div class="gl-tt-name">{{ tooltip.name }}</div>
+      <div class="gl-tt-aqi-row">
+        <span class="gl-tt-aqi" [style.color]="tooltip.col">{{ tooltip.aqi ?? '—' }}</span>
+        <span class="gl-tt-cat" [style.color]="tooltip.col">{{ tooltip.cat }}</span>
+      </div>
+      <div *ngIf="tooltip.aqi !== null" class="gl-tt-safe">
+        Safe outdoors: <span>{{ tooltip.safe }}</span>
+      </div>
+      <div *ngIf="tooltip.src"      class="gl-tt-src">{{ tooltip.src }}</div>
+      <div *ngIf="tooltip.aqi===null" class="gl-tt-nodata">No monitoring station data</div>
+    </div>
+
+    <!-- India state mode indicator -->
+    <div *ngIf="indiaMode" class="gl-india-badge">
+      India — State View <span class="gl-india-hint">zoom out to exit</span>
+    </div>
+
+    <!-- FPS counter — remove before production by passing [showFps]="false" -->
+    <div *ngIf="showFps" class="gl-fps">{{ fps }} fps</div>
+  `,
+  styles: [`
+    :host { display: block; }
+
+    .gl-tooltip {
+      position: fixed; left: 0; top: 0;
+      background: rgba(2,5,16,.96);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 4px; padding: 12px 16px 12px 20px;
+      font-size: 12px; pointer-events: none; z-index: 300;
+      font-family: 'Courier New', monospace; min-width: 180px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      display: flex; flex-direction: column; gap: 4px;
+      will-change: transform;
+    }
+    .gl-tt-bar {
+      position: absolute; left: 0; top: 0; bottom: 0;
+      width: 4px; border-radius: 4px 0 0 4px;
+    }
+    .gl-tt-name    { color:#c8d8f0; font-weight:bold; letter-spacing:.06em; font-size:13px; }
+    .gl-tt-aqi-row { display:flex; align-items:baseline; gap:6px; margin-bottom:4px; }
+    .gl-tt-aqi     { font-size:22px; font-weight:bold; line-height:1; }
+    .gl-tt-cat     { font-size:9px; letter-spacing:.15em; }
+    .gl-tt-safe    { font-size:10px; color:#3a5a7a; }
+    .gl-tt-safe span { color:#5a7a9a; }
+    .gl-tt-src     { font-size:10px; color:#3a5a7a; margin-top:3px; }
+    .gl-tt-nodata  { font-size:9px; color:#2a4a6a; letter-spacing:.12em; font-style:italic; }
+
+    .gl-india-badge {
+      position: fixed; top: 125px; right: 24px;
+      font-size: 10px; letter-spacing:.12em; color:#00e400;
+      font-family: 'Courier New', monospace; z-index: 300;
+      background: rgba(2,5,16,.94); padding: 6px 14px;
+      border: 1px solid #1e3a58; border-radius: 2px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.6);
+    }
+    .gl-india-hint { font-size:8px; color:#3a5a7a; margin-left:8px; }
+
+    .gl-fps {
+      position: fixed; bottom: 60px; right: 24px;
+      font-size: 11px; font-family: 'Courier New', monospace;
+      color: #00e400; background: rgba(2,5,16,.8);
+      padding: 4px 10px; border: 1px solid #1e3a58;
+      border-radius: 2px; z-index: 400; letter-spacing:.1em;
+    }
+  `],
+})
+export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy {
+  @ViewChild('mount', { static: false }) mountRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('stars', { static: false }) starsRef!: ElementRef<HTMLCanvasElement>;
+
+  // ── Inputs — identical signature to Canvas GlobeComponent ──────────────
+  @Input() aqiData: Record<string, any> = {};
+  @Input() selectedCode: string | null = null;
+  @Input() viewMode: 'aqi' | 'pm25' | 'pm10' | 'o3' | 'no2' | 'so2' | 'co' = 'aqi';
+  @Input() showFps = true; // set [showFps]="false" in production
+
+  @Input() set focusCountry(code: string | null) {
+    if (code && this.globe) this.zoomToCode(code);
+  }
+
+  // ── Outputs — identical signature to Canvas GlobeComponent ─────────────
+  @Output() countryClick = new EventEmitter<string>();
+  @Output() stateClick = new EventEmitter<{
+    name: string; aqi: number | null; col: string; cat: string; safe: string; station?: string;
+  }>();
+  @Output() indiaModeChange = new EventEmitter<boolean>();
+
+  // ── Template bindings ───────────────────────────────────────────────────
+  tooltip: { name: string; aqi: number | null; col: string; cat: string; safe: string; src?: string } | null = null;
+  tooltipXform = '';
+  indiaMode = false;
+  fps = 0;
+
+  // ── Private ─────────────────────────────────────────────────────────────
+  private globe: any = null;
+  private worldFeatures: any[] = [];    // active feature set (swaps between lo/hi)
+  private worldFeaturesLo: any[] = []; // 110m — globe scale, 60fps
+  private worldFeaturesHi: any[] = []; // 50m  — zoomed in, natural borders
+  private currentLod: 'lo' | 'hi' = 'lo';
+  private indiaFeatures: any[] = [];
+  private stateAqi: Record<string, any> = {};
+  private indiaLoading = false;
+
+  // DECISION 2: color cache — O(1) per frame, rebuilt only on data/mode change
+  private colorCache = new Map<string, string>();
+  private hoveredKey: string | null = null;
+  private selectedKey: string | null = null;
+  private polygonClicked = false;   // flag: did a polygon absorb this click frame?
+  private globeReady = false;   // flag: worldFeatures loaded, safe to rebuild cache
+
+  // India data cache
+  private geoCache: any[] | null = null;
+  private aqiCache: Record<string, any> | null = null;
+  private aqiCachedAt = 0;
+
+  // FPS meter
+  private fpsFrames = 0;
+  private fpsLast = 0;
+  private fpsRafId = 0;
+  private resumeTimer: any;
+
+  constructor(private zone: NgZone, private cdr: ChangeDetectorRef) { }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Lifecycle
+  // ─────────────────────────────────────────────────────────────────────────
+
+  ngAfterViewInit(): void {
+    window.addEventListener('unhandledrejection', (e) =>
+      console.error('[GlobeWebGL] Unhandled rejection:', e.reason));
+    this.zone.runOutsideAngular(() =>
+      this.boot().catch(err => console.error('[GlobeWebGL] boot() failed:', err)));
+  }
+
+  ngOnChanges(ch: SimpleChanges): void {
+    if (!this.globeReady) return;  // wait until worldFeatures are loaded
+    if (ch['aqiData'] || ch['viewMode']) {
+      this.rebuildColorCache();
+      this.swapPolygons();
+    }
+    if (ch['selectedCode'] && this.selectedCode) {
+      this.zoomToCode(this.selectedCode);
+    }
+  }
+
+  ngOnDestroy(): void {
+    cancelAnimationFrame(this.fpsRafId);
+    clearTimeout(this.resumeTimer);
+    try { this.globe?.renderer()?.dispose(); } catch { }
+    if (this.mountRef?.nativeElement) this.mountRef.nativeElement.innerHTML = '';
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Boot
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private async boot(): Promise<void> {
+    this.drawStars();
+    await this.initGlobe();
+    if (this.showFps) this.startFps();
+  }
+
+  private drawStars(): void {
+    const cv = this.starsRef?.nativeElement;
+    if (!cv) return;
+    cv.width = window.innerWidth; cv.height = window.innerHeight;
+    const ctx = cv.getContext('2d')!;
+    ctx.fillStyle = '#020812'; ctx.fillRect(0, 0, cv.width, cv.height);
+
+    // Three depth tiers
+    const tiers = [
+      { count: 600, minR: 0.3, maxR: 0.7, minA: 0.4, maxA: 0.85 },
+      { count: 200, minR: 0.7, maxR: 1.2, minA: 0.6, maxA: 1.0 },
+      { count: 40, minR: 1.2, maxR: 2.0, minA: 0.8, maxA: 1.0 },
+    ];
+    for (const tier of tiers) {
+      for (let i = 0; i < tier.count; i++) {
+        const x = Math.random() * cv.width, y = Math.random() * cv.height;
+        const r = tier.minR + Math.random() * (tier.maxR - tier.minR);
+        const a = tier.minA + Math.random() * (tier.maxA - tier.minA);
+        const col = Math.random() < 0.15 ? `rgba(180,200,255,${a})`
+          : Math.random() < 0.08 ? `rgba(255,220,180,${a})`
+            : `rgba(255,255,255,${a})`;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    // Milky Way diagonal glow
+    const mw = ctx.createLinearGradient(0, cv.height * .2, cv.width, cv.height * .8);
+    mw.addColorStop(0, 'rgba(60,80,140,0)');
+    mw.addColorStop(0.3, 'rgba(60,80,140,0.04)');
+    mw.addColorStop(0.5, 'rgba(80,100,160,0.07)');
+    mw.addColorStop(0.7, 'rgba(60,80,140,0.04)');
+    mw.addColorStop(1, 'rgba(60,80,140,0)');
+    ctx.fillStyle = mw; ctx.fillRect(0, 0, cv.width, cv.height);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Globe initialisation
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private async initGlobe(): Promise<void> {
+    const mount = this.mountRef.nativeElement;
+    const W = window.innerWidth;
+    const H = window.innerHeight - 38;
+
+    this.globe = new (Globe as any)(mount, { rendererConfig: { antialias: true, alpha: true } });
+
+    this.globe
+      .width(W).height(H)
+      .backgroundColor('rgba(0,0,0,0)')  // transparent — stars canvas shows through
+      .showAtmosphere(true)
+      .atmosphereColor('#1a4080')
+      .atmosphereAltitude(0.18)
+      .showGraticules(false);            // no grid lines on ocean
+
+    // DECISION 3: pixel ratio cap — single most impactful line for retina/mobile fps
+    this.globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
+
+    // OrbitControls setup
+    const ctrl = this.globe.controls();
+    ctrl.autoRotate = true;
+    ctrl.autoRotateSpeed = 0.4;
+    ctrl.enableDamping = false; // damping + autoRotate = jitter
+
+    const domEl = this.globe.renderer().domElement;
+    domEl.addEventListener('pointerdown', () => { ctrl.autoRotate = false; });
+    domEl.addEventListener('pointerup', () => {
+      clearTimeout(this.resumeTimer);
+      this.resumeTimer = setTimeout(() => { ctrl.autoRotate = true; }, 1500);
+    });
+
+    // Ocean click → deselect selected country / close side panel
+    // globe.gl's onPolygonClick only fires ON a polygon — clicking ocean never triggers it.
+    // Use canvas click + hoveredKey: if mouse is not over any polygon when clicking, deselect.
+    domEl.addEventListener('click', () => {
+      // Small timeout so onPolygonClick fires first if it's going to
+      setTimeout(() => {
+        if (!this.polygonClicked && this.selectedKey) {
+          this.selectedKey = null;
+          this.swapPolygons();
+          this.zone.run(() => {
+            this.countryClick.emit(''); // empty string signals app.component to close panel
+            this.cdr.detectChanges();
+          });
+        }
+        this.polygonClicked = false;
+      }, 20);
+    });
+
+    console.log('[GlobeWebGL] fetching world topo (110m + 50m)...');
+    const topo = await import('topojson-client')
+      .catch(err => { console.error('[GlobeWebGL] topojson import failed:', err); return null; });
+    if (!topo) return;
+
+    // Fetch both resolutions in parallel — 110m loads fast, 50m loads in background
+    const [worldLo, worldHi] = await Promise.all([
+      fetch(WORLD_URL_LO).then(r => r.json()).catch(() => null),
+      fetch(WORLD_URL_HI).then(r => r.json()).catch(() => null),
+    ]);
+    if (!worldLo) { console.error('[GlobeWebGL] 110m fetch failed'); return; }
+
+    this.worldFeaturesLo = (topo.feature(worldLo, (worldLo.objects as any).countries) as any).features;
+    this.worldFeaturesHi = worldHi
+      ? (topo.feature(worldHi, (worldHi.objects as any).countries) as any).features
+      : this.worldFeaturesLo; // fallback to lo if hi fails
+
+    // Fetch india-official.json and apply correct geometry swap (canvas pattern)
+    try {
+      const india = await fetch('assets/india-official.json').then(r => r.json());
+      const indiaGeometry = india.geometry ?? (india.type === 'Feature' ? india.geometry : india.features?.[0]?.geometry);
+      if (indiaGeometry) {
+        // Swap geometry in BOTH lod sets — preserve numeric id
+        for (const features of [this.worldFeaturesLo, this.worldFeaturesHi]) {
+          const idx = features.findIndex((f: any) => codeFromNumeric(f.id) === 'IN');
+          if (idx !== -1) features[idx] = { ...features[idx], geometry: indiaGeometry };
+        }
+        console.log('[India] official boundary applied to both LOD sets');
+      }
+    } catch (e) {
+      console.warn('[India] official boundary failed:', e);
+    }
+
+    // Start with lo-res at globe scale
+    this.worldFeatures = this.worldFeaturesLo;
+    this.currentLod = 'lo';
+    console.log('[GlobeWebGL] lo features:', this.worldFeaturesLo.length, '| hi features:', this.worldFeaturesHi.length);
+
+    // Mark ready BEFORE rebuilding cache — ngOnChanges may have queued aqiData already
+    this.globeReady = true;
+
+    // DECISION 2: build color cache — aqiData may already be populated from ngOnChanges
+    this.rebuildColorCache();
+
+    // Polygon layer — all callbacks are O(1) Map lookups
+    this.globe
+      .polygonsData(this.worldFeatures)
+      .polygonCapColor((f: any) => this.colorCache.get(this.fkey(f)) ?? NO_DATA_COLOR)
+      .polygonSideColor(() => SIDE_COLOR)
+      .polygonStrokeColor((f: any) => {
+        const k = this.fkey(f);
+        return (k === this.hoveredKey || k === this.selectedKey) ? STROKE_ACTIVE : STROKE_DEFAULT;
+      })
+      .polygonAltitude((f: any) => {
+        const k = this.fkey(f);
+        if (k === this.selectedKey) return ALT_SELECTED;
+        if (k === this.hoveredKey) return ALT_HOVER;
+        return ALT_DEFAULT;
+      })
+      .polygonLabel(() => '')
+      .polygonsTransitionDuration(0)     // kills altitude animation — stops West Asia jitter
+      .onPolygonHover((f: any, _: any, e: MouseEvent) => this.onHover(f, e))
+      .onPolygonClick((f: any, e: MouseEvent) => this.onClick(f, e));
+
+    this.globe.pointOfView({ lat: 20, lng: 0, altitude: 2.5 });
+
+    // Apply ocean AFTER pointOfView — globe.gl async init is complete by now
+    this.applyOceanMaterial();
+
+    // Zoom → India mode trigger
+    this.globe.onZoom(({ lat, lng, altitude }: any) => this.onZoom(lat, lng, altitude));
+
+    // Tooltip repositioning — no detectChanges, only transform update
+    mount.addEventListener('mousemove', (e: MouseEvent) => {
+      if (!this.tooltip) return;
+      const flip = e.clientX > window.innerWidth - 250;
+      this.tooltipXform = `translate(${flip ? e.clientX - 220 : e.clientX + 14}px,${e.clientY - 12}px)`;
+    });
+
+    window.addEventListener('resize', () =>
+      this.globe.width(window.innerWidth).height(window.innerHeight - 38));
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Ocean material
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private applyOceanMaterial(): void {
+    const W = 2048, H = 1024;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d')!;
+
+    // Deep ocean base — visible dark blue, clearly distinct from space
+    ctx.fillStyle = '#0b1f4a';
+    ctx.fillRect(0, 0, W, H);
+
+    // Latitude depth bands
+    const lat = ctx.createLinearGradient(0, 0, 0, H);
+    lat.addColorStop(0, 'rgba(30,80,160,0.50)');
+    lat.addColorStop(0.2, 'rgba(15,50,120,0.30)');
+    lat.addColorStop(0.5, 'rgba(5,20,70,0.10)');
+    lat.addColorStop(0.8, 'rgba(15,50,120,0.30)');
+    lat.addColorStop(1, 'rgba(30,80,160,0.50)');
+    ctx.fillStyle = lat; ctx.fillRect(0, 0, W, H);
+
+    // Ocean current shimmer
+    for (let i = 0; i < 200; i++) {
+      const x = Math.random() * W, y = Math.random() * H;
+      const rx = Math.random() * 120 + 30, ry = Math.random() * 40 + 10;
+      const rg = ctx.createRadialGradient(x, y, 0, x, y, rx);
+      rg.addColorStop(0, `rgba(20,60,140,${Math.random() * .05 + .01})`);
+      rg.addColorStop(1, 'rgba(5,15,50,0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath(); ctx.ellipse(x, y, rx, ry, Math.random() * Math.PI, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Polar ice caps
+    const iN = ctx.createLinearGradient(0, 0, 0, H * .12);
+    iN.addColorStop(0, 'rgba(210,235,255,0.55)'); iN.addColorStop(1, 'rgba(180,215,255,0)');
+    ctx.fillStyle = iN; ctx.fillRect(0, 0, W, H * .12);
+    const iS = ctx.createLinearGradient(0, H * .88, 0, H);
+    iS.addColorStop(0, 'rgba(180,215,255,0)'); iS.addColorStop(1, 'rgba(220,240,255,0.65)');
+    ctx.fillStyle = iS; ctx.fillRect(0, H * .88, W, H * .12);
+
+    // Equatorial specular band
+    const sun = ctx.createLinearGradient(W * .3, 0, W * .7, 0);
+    sun.addColorStop(0, 'rgba(80,140,255,0)'); sun.addColorStop(.5, 'rgba(80,140,255,0.06)'); sun.addColorStop(1, 'rgba(80,140,255,0)');
+    ctx.fillStyle = sun; ctx.fillRect(0, H * .35, W, H * .30);
+
+    const url = cv.toDataURL('image/jpeg', 0.95);
+    this.globe.globeImageUrl(url);
+    // Re-apply once more after 800ms to survive any late globe.gl internal overwrites
+    setTimeout(() => this.globe.globeImageUrl(url), 800);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DECISION 2: Color cache
+  // Rebuilt once when aqiData / viewMode / indiaMode changes.
+  // Per-frame callbacks do O(1) Map lookup — zero computation inside render loop.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private rebuildColorCache(): void {
+    this.colorCache.clear();
+
+    // Always build world cache
+    for (const f of this.worldFeatures) {
+      const code = codeFromNumeric(f.id);
+      const data = code ? this.aqiData[code] : null;
+      const val = data
+        ? (this.viewMode === 'aqi' ? data.avgAqi : (data.iaqi?.[this.viewMode] ?? null))
+        : null;
+      this.colorCache.set(this.fkey(f), val != null ? aqiInfo(val).col : NO_DATA_COLOR);
+    }
+
+    // Additionally cache state features when in India mode
+    if (this.indiaMode) {
+      for (const f of this.indiaFeatures) {
+        const raw = f.properties?.shapeName || f.properties?.name || '';
+        const data = this.stateAqi[normalizeState(raw)] ?? this.stateAqi[raw];
+        this.colorCache.set(this.fkey(f), data ? aqiInfo(data.aqi).col : NO_DATA_COLOR);
+      }
+    }
+  }
+
+  // Stable string key for any feature (works for both world + state GeoJSON)
+  private fkey(f: any): string {
+    return String(f?.id ?? f?.properties?.shapeName ?? f?.properties?.name ?? '');
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Hover
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private onHover(feat: any, e?: MouseEvent): void {
+    const key = feat ? this.fkey(feat) : null;
+
+    if (!feat || key === null) {
+      if (this.hoveredKey) {
+        this.hoveredKey = null;
+        this.tooltip = null;
+        this.zone.run(() => this.cdr.detectChanges());
+      }
+      return;
+    }
+
+    if (key === this.hoveredKey) return; // same feature — skip CD entirely
+
+    this.hoveredKey = key;
+    this.pauseAutoRotate();
+
+    if (this.indiaMode) {
+      const raw = feat.properties?.shapeName || feat.properties?.name || '';
+      const norm = normalizeState(raw);
+      const data = this.stateAqi[norm] ?? this.stateAqi[raw];
+      const info = aqiInfo(data?.aqi);
+      if (e) this.tooltipXform = `translate(${e.clientX + 14}px,${e.clientY - 12}px)`;
+      this.tooltip = {
+        name: raw, aqi: data?.aqi ?? null,
+        col: info.col, cat: info.cat,
+        safe: safeOutdoorTime(data?.aqi ?? undefined).healthy,
+        src: data?.city,
+      };
+    } else {
+      const code = codeFromNumeric(feat.id);
+      const data = code ? this.aqiData[code] : null;
+      const val = data
+        ? (this.viewMode === 'aqi' ? data.avgAqi : (data.iaqi?.[this.viewMode] ?? null))
+        : null;
+      const info = aqiInfo(val);
+      const tagInfo = data?.dominentpol ? SOURCE_TAGS[data.dominentpol] : undefined;
+      if (e) this.tooltipXform = `translate(${e.clientX + 14}px,${e.clientY - 12}px)`;
+      this.tooltip = {
+        name: data?.name || code || 'Unknown', aqi: val,
+        col: info.col, cat: info.cat,
+        safe: safeOutdoorTime(val ?? undefined).healthy,
+        src: tagInfo?.tag,
+      };
+    }
+
+    this.zone.run(() => this.cdr.detectChanges());
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Click
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private onClick(feat: any, e: MouseEvent): void {
+    this.polygonClicked = !!feat; // tells canvas click listener a polygon was hit
+    if (!feat) {
+      if (this.selectedKey) {
+        this.selectedKey = null;
+        this.swapPolygons();
+        this.zone.run(() => this.cdr.detectChanges());
+      }
+      return;
+    }
+    this.pauseAutoRotate();
+
+    if (this.indiaMode) {
+      const raw = feat.properties?.shapeName || feat.properties?.name || '';
+      const norm = normalizeState(raw);
+      const data = this.stateAqi[norm] ?? this.stateAqi[raw];
+      const info = aqiInfo(data?.aqi);
+      this.zone.run(() => this.stateClick.emit({
+        name: raw, aqi: data?.aqi ?? null,
+        col: info.col, cat: info.cat,
+        safe: safeOutdoorTime(data?.aqi ?? undefined).healthy,
+        station: data?.city,
+      }));
+      return;
+    }
+
+    const code = codeFromNumeric(feat.id);
+    if (!code) return;
+
+    this.selectedKey = this.fkey(feat);
+    this.swapPolygons();
+
+    if (code === 'IN') {
+      this.zone.run(() => this.enterIndia());
+    } else {
+      // Emit immediately — app.component receives code + pre-loaded aqiData snapshot
+      // so side panel can render current data without waiting for a new fetch
+      this.zone.run(() => this.countryClick.emit(code));
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Zoom → India mode
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private onZoom(lat: number, lng: number, altitude: number): void {
+    // LOD switch — 110m at globe scale, 50m when zoomed in
+    if (!this.indiaMode && this.worldFeaturesHi.length) {
+      const wantHi = altitude < LOD_SWITCH_ALT;
+      if (wantHi && this.currentLod === 'lo') {
+        this.currentLod = 'hi';
+        this.worldFeatures = this.worldFeaturesHi;
+        this.rebuildColorCache();
+        this.swapPolygons();
+      } else if (!wantHi && this.currentLod === 'hi') {
+        this.currentLod = 'lo';
+        this.worldFeatures = this.worldFeaturesLo;
+        this.rebuildColorCache();
+        this.swapPolygons();
+      }
+    }
+
+    if (!this.indiaMode && altitude < INDIA_ENTER_ALT && isOverIndia(lat, lng)) {
+      this.zone.run(() => this.enterIndia());
+    } else if (this.indiaMode && (altitude > INDIA_EXIT_ALT || !isOverIndia(lat, lng))) {
+      this.zone.run(() => this.exitIndia());
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DECISION 4: India state mode — swap, never overlap
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private async enterIndia(): Promise<void> {
+    if (this.indiaMode || this.indiaLoading) return;
+    this.indiaLoading = true;
+
+    try {
+      const [features, rawAqi] = await Promise.all([this.loadGeo(), this.loadAqi()]);
+      if (this.indiaMode) return; // double-trigger guard
+
+      const DISPUTED = [
+        'aksai chin', 'pakistan', 'azad', 'gilgit', 'pok',
+        'jammu & kashmir (disputed)', 'demchok', 'chumar',
+        'arunachal', // remove if your GeoJSON has it as an Indian state
+      ];
+      this.indiaFeatures = features.filter((f: any) => {
+        const name = (f.properties?.shapeName || f.properties?.name || '').toLowerCase();
+        return !DISPUTED.some(d => name.includes(d));
+      });
+      console.log('[India after filter]', this.indiaFeatures.map((f: any) => f.properties?.shapeName || f.properties?.name));
+
+      // Normalize stateAqi keys once on load
+      this.stateAqi = {};
+      for (const [k, v] of Object.entries(rawAqi)) {
+        this.stateAqi[normalizeState(k)] = v;
+      }
+
+      this.indiaMode = true;
+      this.indiaModeChange.emit(true);
+      this.rebuildColorCache();
+      this.swapPolygons();
+      this.cdr.detectChanges();
+    } finally {
+      this.indiaLoading = false;
+    }
+  }
+
+  private exitIndia(): void {
+    if (!this.indiaMode || this.indiaLoading) return;
+    this.indiaMode = false;
+    this.hoveredKey = null;
+    this.indiaModeChange.emit(false);
+    this.rebuildColorCache();
+    this.swapPolygons();
+    this.cdr.detectChanges();
+  }
+
+  // Helper — re-uploads current feature set (forces globe.gl to re-read all callbacks)
+  private swapPolygons(): void {
+    if (!this.globe) return;
+    if (this.indiaMode) {
+      // Keep all countries except India polygon + overlay state features
+      const withoutIndia = this.worldFeatures.filter(f => codeFromNumeric(f.id) !== 'IN');
+      this.globe.polygonsData([...withoutIndia, ...this.indiaFeatures]);
+    } else {
+      this.globe.polygonsData([...this.worldFeatures]);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Zoom to country
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private zoomToCode(code: string): void {
+    const feat = this.worldFeatures.find(f => codeFromNumeric(f.id) === code);
+    if (!feat) return;
+
+    const coords = flatCoords(feat.geometry);
+    if (!coords.length) return;
+
+    const lats = coords.map((c: number[]) => c[1]);
+    const lngs = coords.map((c: number[]) => c[0]);
+    const lat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const lng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+    const alt = code === 'IN' ? 1.1 : 1.5;
+
+    this.pauseAutoRotate();
+    this.selectedKey = this.fkey(feat);
+    this.globe.pointOfView({ lat, lng, altitude: alt }, 900);
+    this.swapPolygons();
+
+    if (code === 'IN') {
+      setTimeout(() => this.zone.run(() => this.enterIndia()), 950);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Data loaders
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private async loadGeo(): Promise<any[]> {
+    if (this.geoCache) return this.geoCache;
+    try {
+      const gj = await fetch('/assets/india-states-simplified.json').then(r => r.json());
+      this.geoCache = gj.type === 'FeatureCollection' ? gj.features : [gj];
+      return this.geoCache!;
+    } catch { return []; }
+  }
+
+  private async loadAqi(): Promise<Record<string, any>> {
+    const now = Date.now();
+    if (this.aqiCache && now - this.aqiCachedAt < INDIA_AQI_TTL) return this.aqiCache;
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 30_000);
+      const json = await fetch('/api/aqi/india/states', { signal: ctrl.signal }).then(r => r.json());
+      clearTimeout(t);
+      if (json.states) { this.aqiCache = json.states; this.aqiCachedAt = now; }
+      return this.aqiCache ?? {};
+    } catch { return this.aqiCache ?? {}; }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Auto-rotation helpers
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private pauseAutoRotate(): void {
+    const c = this.globe?.controls();
+    if (!c) return;
+    c.autoRotate = false;
+    clearTimeout(this.resumeTimer);
+    this.resumeTimer = setTimeout(() => {
+      if (this.globe) this.globe.controls().autoRotate = true;
+    }, 3000);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FPS meter (outside Angular zone — no CD pressure)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private startFps(): void {
+    this.fpsLast = performance.now();
+    const tick = () => {
+      this.fpsFrames++;
+      const now = performance.now();
+      if (now - this.fpsLast >= 1000) {
+        const measured = this.fpsFrames;
+        this.fpsFrames = 0;
+        this.fpsLast = now;
+        this.zone.run(() => { this.fps = measured; this.cdr.detectChanges(); });
+      }
+      this.fpsRafId = requestAnimationFrame(tick);
+    };
+    this.fpsRafId = requestAnimationFrame(tick);
+  }
+}
