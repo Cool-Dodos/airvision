@@ -7,11 +7,12 @@ import { CommonModule } from '@angular/common';
 import { aqiInfo, NUMERIC_TO_CODE } from '../../utils/aqi';
 import { safeOutdoorTime, SOURCE_TAGS } from '../../utils/health';
 import Globe from 'globe.gl';
+import { difference } from '@turf/difference';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 // LOD: 110m at globe scale for 60fps, swap to 50m when zoomed in for real borders
 const WORLD_URL_LO = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
-const WORLD_URL_HI = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json';
+const WORLD_URL_HI = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 const LOD_SWITCH_ALT = 1.8; // altitude threshold — below this zoom uses 50m
 const NO_DATA_COLOR = '#284678';
 const OCEAN_COLOR = '#040c1e';
@@ -361,17 +362,55 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
     // Fetch india-official.json and apply correct geometry swap (canvas pattern)
     try {
       const india = await fetch('assets/india-official.json').then(r => r.json());
-      const indiaGeometry = india.geometry ?? (india.type === 'Feature' ? india.geometry : india.features?.[0]?.geometry);
+      const indiaGeometry = india.geometry ?? india.features?.[0]?.geometry;
+
       if (indiaGeometry) {
-        // Swap geometry in BOTH lod sets — preserve numeric id
-        for (const features of [this.worldFeaturesLo, this.worldFeaturesHi]) {
-          const idx = features.findIndex((f: any) => codeFromNumeric(f.id) === 'IN');
-          if (idx !== -1) features[idx] = { ...features[idx], geometry: indiaGeometry };
+        const indiaFeature = {
+          type: 'Feature' as const,
+          properties: {},
+          geometry: indiaGeometry
+        };
+
+        // Only working with LO now — HI is same data
+        const features = this.worldFeaturesLo;
+
+        // 1. Replace India with official boundary
+        const inIdx = features.findIndex((f: any) => codeFromNumeric(f.id) === 'IN');
+        if (inIdx !== -1) {
+          features[inIdx] = { ...features[inIdx], geometry: indiaGeometry };
         }
-        console.log('[India] official boundary applied to both LOD sets');
+
+        // 2. Clip Pakistan
+        const pkIdx = features.findIndex((f: any) => codeFromNumeric(f.id) === 'PK');
+        if (pkIdx !== -1) {
+          try {
+            // @ts-ignore: Turf v7 typings incorrectly expect 1 argument instead of 2
+            const clipped = difference({ type: 'Feature' as const, properties: {}, geometry: features[pkIdx].geometry } as any, indiaFeature as any);
+            if (clipped?.geometry) {
+              features[pkIdx] = { ...features[pkIdx], geometry: clipped.geometry };
+            }
+          } catch { console.warn('[India] PK clip failed'); }
+        }
+
+        // 3. Clip China
+        const cnIdx = features.findIndex((f: any) => codeFromNumeric(f.id) === 'CN');
+        if (cnIdx !== -1) {
+          try {
+            // @ts-ignore: Turf v7 typings incorrectly expect 1 argument instead of 2
+            const clipped = difference({ type: 'Feature' as const, properties: {}, geometry: features[cnIdx].geometry } as any, indiaFeature as any);
+            if (clipped?.geometry) {
+              features[cnIdx] = { ...features[cnIdx], geometry: clipped.geometry };
+            }
+          } catch { console.warn('[India] CN clip failed'); }
+        }
+
+        // 4. Sync HI = LO (same resolution now)
+        this.worldFeaturesHi = [...features];
+
+        console.log('[India] Official boundary applied — PK and CN clipped');
       }
     } catch (e) {
-      console.warn('[India] official boundary failed:', e);
+      console.warn('[India] border fix failed:', e);
     }
 
     // Start with lo-res at globe scale
@@ -396,14 +435,11 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
         return (k === this.hoveredKey || k === this.selectedKey) ? STROKE_ACTIVE : STROKE_DEFAULT;
       })
       .polygonAltitude((f: any) => {
-        const k = this.fkey(f);
+        const k    = this.fkey(f);
         const code = codeFromNumeric(f.id);
         if (k === this.selectedKey) return ALT_SELECTED;
         if (k === this.hoveredKey)  return ALT_HOVER;
-        
-        // India physical overlay priority (works for both country and state features)
-        if (code === 'IN' || (this.indiaMode && !f.id)) return ALT_DEFAULT + 0.001; 
-        
+        if (code === 'IN')          return ALT_DEFAULT + 0.002;
         return ALT_DEFAULT;
       })
       .polygonLabel(() => '')
@@ -553,9 +589,12 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
     } else {
       const code = codeFromNumeric(feat.id);
       if (!code) {
-        // Unknown small territory — show neutral tooltip or skip
-        this.tooltip = null;
-        this.zone.run(() => this.cdr.detectChanges());
+        // Unknown territory — clear tooltip silently
+        if (this.hoveredKey) {
+          this.hoveredKey = null;
+          this.tooltip = null;
+          this.zone.run(() => this.cdr.detectChanges());
+        }
         return;
       }
       const data = this.aqiData[code] || null;
@@ -623,29 +662,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
   // ─────────────────────────────────────────────────────────────────────────
 
   private onZoom(lat: number, lng: number, altitude: number): void {
-    // LOD switch — 110m at globe scale, 50m when zoomed in
-    if (!this.indiaMode && this.worldFeaturesHi.length) {
-      const buffer = 0.2; 
-      // Only switch to Hi if we go BELOW (LOD_SWITCH_ALT - buffer)
-      // Only switch to Lo if we go ABOVE (LOD_SWITCH_ALT + buffer)
-      const wantHi = altitude < (this.currentLod === 'lo' ? (LOD_SWITCH_ALT - buffer) : (LOD_SWITCH_ALT + buffer));
-      
-      if (wantHi && this.currentLod === 'lo') {
-        this.currentLod = 'hi';
-        this.worldFeatures = this.worldFeaturesHi;
-        requestAnimationFrame(() => {
-          this.rebuildColorCache();
-          this.swapPolygons();
-        });
-      } else if (!wantHi && this.currentLod === 'hi') {
-        this.currentLod = 'lo';
-        this.worldFeatures = this.worldFeaturesLo;
-        requestAnimationFrame(() => {
-          this.rebuildColorCache();
-          this.swapPolygons();
-        });
-      }
-    }
+    // LOD switch intentionally stripped to prevent zoom freezes
 
     if (!this.indiaMode && altitude < INDIA_ENTER_ALT && isOverIndia(lat, lng)) {
       this.zone.run(() => this.enterIndia());
@@ -719,6 +736,31 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
   // ─────────────────────────────────────────────────────────────────────────
 
   private zoomToCode(code: string): void {
+    // Hardcoded POV for MultiPolygon countries whose centroid is wrong
+    const HARDCODED: Record<string, { lat: number; lng: number; altitude: number }> = {
+      US: { lat: 39.5,  lng: -98.5, altitude: 1.8 },
+      RU: { lat: 61.0,  lng: 90.0,  altitude: 1.5 },
+      CN: { lat: 35.0,  lng: 103.0, altitude: 1.4 },
+      CA: { lat: 56.0,  lng: -96.0, altitude: 1.6 },
+      AU: { lat: -25.0, lng: 133.0, altitude: 1.5 },
+      IN: { lat: 22.0,  lng: 80.0,  altitude: 1.1 },
+    };
+
+    if (HARDCODED[code]) {
+      this.pauseAutoRotate();
+      const feat = this.worldFeatures.find(f => codeFromNumeric(f.id) === code);
+      if (feat) {
+        this.selectedKey = this.fkey(feat);
+        this.swapPolygons();
+      }
+      this.globe.pointOfView(HARDCODED[code], 900);
+      if (code === 'IN') {
+        setTimeout(() => this.zone.run(() => this.enterIndia()), 950);
+      }
+      return;
+    }
+
+    // Normal centroid calculation for all other countries
     const feat = this.worldFeatures.find(f => codeFromNumeric(f.id) === code);
     if (!feat) return;
 
@@ -729,19 +771,11 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
     const lngs = coords.map((c: number[]) => c[0]);
     const lat = (Math.min(...lats) + Math.max(...lats)) / 2;
     const lng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
-    const alt = code === 'IN' ? 1.1 : 1.5;
 
     this.pauseAutoRotate();
     this.selectedKey = this.fkey(feat);
-    this.globe.pointOfView({ lat, lng, altitude: alt }, 900);
-
-    // Defer the heavy geometry rebuild (swapPolygons) until after the camera completes its animation.
-    // This prevents the main thread from freezing and stuttering the zoom effect!
-    if (code === 'IN') {
-      setTimeout(() => this.zone.run(() => this.enterIndia()), 900);
-    } else {
-      setTimeout(() => this.swapPolygons(), 900);
-    }
+    this.globe.pointOfView({ lat, lng, altitude: 1.5 }, 900);
+    this.swapPolygons();
   }
 
   // ─────────────────────────────────────────────────────────────────────────

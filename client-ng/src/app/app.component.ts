@@ -130,7 +130,6 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
 
   setShareData(d: any) {
     if (!d) return;
-    console.log('Setting share data:', d);
     const info = aqiInfo(d.avgAqi);
     this.shareData = {
       name:        d.countryName,
