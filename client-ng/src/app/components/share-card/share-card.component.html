@@ -4,13 +4,19 @@
     <button class="close-btn" (click)="close.emit()" aria-label="Close share card">✕</button>
 
     <div class="share-header" *ngIf="data">
-      <div class="share-aqi-badge" [style.background-color]="data.col">
-        <span class="share-aqi-val">{{ data.aqi }}</span>
-        <span class="share-aqi-label">AQI</span>
+      <div class="share-brand">
+        <img src="assets/logo.jpg" class="share-logo" alt="AirVision"/>
+        <span class="share-brand-name">AirVision Global</span>
       </div>
-      <div class="share-meta">
-        <h3 class="share-country">{{ data.name }}</h3>
-        <p class="share-category">{{ data.cat }}</p>
+      <div class="share-hero">
+        <div class="share-aqi-badge" [style.background-color]="data.col">
+          <span class="share-aqi-val">{{ data.aqi }}</span>
+          <span class="share-aqi-label">AQI</span>
+        </div>
+        <div class="share-meta">
+          <h3 class="share-country">{{ data.name }}</h3>
+          <p class="share-category">{{ data.cat }}</p>
+        </div>
       </div>
     </div>
 
