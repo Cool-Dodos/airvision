@@ -13,7 +13,7 @@ import Globe from 'globe.gl';
 const WORLD_URL_LO = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
 const WORLD_URL_HI = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json';
 const LOD_SWITCH_ALT = 1.8; // altitude threshold — below this zoom uses 50m
-const NO_DATA_COLOR = 'rgba(40,70,120,0.92)';
+const NO_DATA_COLOR = '#284678';
 const OCEAN_COLOR = '#040c1e';
 const STROKE_DEFAULT = 'rgba(2,5,16,0.8)';
 const STROKE_ACTIVE = 'rgba(255,255,255,0.4)';
@@ -47,7 +47,8 @@ function normalizeState(name: string): string {
 }
 
 function codeFromNumeric(id: string | number): string | undefined {
-  return NUMERIC_TO_CODE[String(id)];
+  if (id === undefined || id === null) return undefined;
+  return NUMERIC_TO_CODE[String(Number(id))];
 }
 
 function isOverIndia(lat: number, lng: number): boolean {
@@ -396,8 +397,13 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
       })
       .polygonAltitude((f: any) => {
         const k = this.fkey(f);
+        const code = codeFromNumeric(f.id);
         if (k === this.selectedKey) return ALT_SELECTED;
-        if (k === this.hoveredKey) return ALT_HOVER;
+        if (k === this.hoveredKey)  return ALT_HOVER;
+        
+        // India physical overlay priority (works for both country and state features)
+        if (code === 'IN' || (this.indiaMode && !f.id)) return ALT_DEFAULT + 0.001; 
+        
         return ALT_DEFAULT;
       })
       .polygonLabel(() => '')
@@ -546,8 +552,13 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
       };
     } else {
       const code = codeFromNumeric(feat.id);
-      if (!code) return;
-      const data = code ? this.aqiData[code] : null;
+      if (!code) {
+        // Unknown small territory — show neutral tooltip or skip
+        this.tooltip = null;
+        this.zone.run(() => this.cdr.detectChanges());
+        return;
+      }
+      const data = this.aqiData[code] || null;
       const val = data
         ? (this.viewMode === 'aqi' ? data.avgAqi : (data.iaqi?.[this.viewMode] ?? null))
         : null;
@@ -614,17 +625,25 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
   private onZoom(lat: number, lng: number, altitude: number): void {
     // LOD switch — 110m at globe scale, 50m when zoomed in
     if (!this.indiaMode && this.worldFeaturesHi.length) {
-      const wantHi = altitude < LOD_SWITCH_ALT;
+      const buffer = 0.2; 
+      // Only switch to Hi if we go BELOW (LOD_SWITCH_ALT - buffer)
+      // Only switch to Lo if we go ABOVE (LOD_SWITCH_ALT + buffer)
+      const wantHi = altitude < (this.currentLod === 'lo' ? (LOD_SWITCH_ALT - buffer) : (LOD_SWITCH_ALT + buffer));
+      
       if (wantHi && this.currentLod === 'lo') {
         this.currentLod = 'hi';
         this.worldFeatures = this.worldFeaturesHi;
-        this.rebuildColorCache();
-        requestAnimationFrame(() => this.swapPolygons());
+        requestAnimationFrame(() => {
+          this.rebuildColorCache();
+          this.swapPolygons();
+        });
       } else if (!wantHi && this.currentLod === 'hi') {
         this.currentLod = 'lo';
         this.worldFeatures = this.worldFeaturesLo;
-        this.rebuildColorCache();
-        requestAnimationFrame(() => this.swapPolygons());
+        requestAnimationFrame(() => {
+          this.rebuildColorCache();
+          this.swapPolygons();
+        });
       }
     }
 
@@ -648,9 +667,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
       if (this.indiaMode) return; // double-trigger guard
 
       const DISPUTED = [
-        'aksai chin', 'pakistan', 'azad', 'gilgit', 'pok',
-        'jammu & kashmir (disputed)', 'demchok', 'chumar',
-        'arunachal', // remove if your GeoJSON has it as an Indian state
+        'jammu & kashmir (disputed)', // only filter the generic topological artifact
       ];
       this.indiaFeatures = features.filter((f: any) => {
         const name = (f.properties?.shapeName || f.properties?.name || '').toLowerCase();
@@ -688,9 +705,9 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
   private swapPolygons(): void {
     if (!this.globe) return;
     if (this.indiaMode) {
-      // Keep all countries except India polygon + overlay state features. Also remove overlapping neighbors
-      const NEIGHBORS = ['IN', 'NP', 'BD', 'MM', 'BT', 'PK', 'AF', 'CN'];
-      const withoutIndia = this.worldFeatures.filter(f => !NEIGHBORS.includes(codeFromNumeric(f.id) || ''));
+      // Keep all countries except the main India country polygon.
+      // Unlike previous version, we DO keep neighbors (PK, CN, etc.) to show a full map.
+      const withoutIndia = this.worldFeatures.filter(f => codeFromNumeric(f.id) !== 'IN');
       this.globe.polygonsData([...withoutIndia, ...this.indiaFeatures]);
     } else {
       this.globe.polygonsData([...this.worldFeatures]);
