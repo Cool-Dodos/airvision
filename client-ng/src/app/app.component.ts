@@ -38,7 +38,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   shareData: any = null;
   snapshots: any[] = [];
   isHistorical = false;
-  indiaMode = false;
+  indiaStateMode = false;
 
   readonly legend = [
     { col: '#1e3050', label: 'No Data'             },
@@ -96,6 +96,15 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   }
   get globalInfo() { return aqiInfo(parseFloat(this.globalAvg)); }
 
+  onIndiaStatesClick(): void {
+    this.indiaStateMode = !this.indiaStateMode;
+    if (this.indiaStateMode) {
+      // Clear any selected country when entering state mode
+      this.selectedCode = null;
+      this.shareData = null;
+    }
+  }
+
   onCountryClick(code: string): void {
     if (!code) {
       this.onClose();
@@ -108,6 +117,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   onClose() {
     this.selectedCode = null;
     this.selectedState = null;
+    this.indiaStateMode = false; // Reset state mode if user closes panel/clicks ocean
     this.focusCountry = null;
     this.shareData = null;
   }
@@ -153,6 +163,30 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     this.selectedCode = code;
     this.selectedState = null;
     this.focusCountry = code;
+  }
+
+  getMask(aqi: number | null): string {
+    if (!aqi) return 'Not needed';
+    if (aqi <= 100) return 'Optional';
+    if (aqi <= 150) return 'Recommended';
+    if (aqi <= 200) return 'Required';
+    return 'Critical';
+  }
+
+  getMaskColor(aqi: number | null): string {
+    if (!aqi || aqi <= 100) return '#00b894';
+    if (aqi <= 150) return '#fdcb6e';
+    if (aqi <= 200) return '#d63031';
+    return '#a8071a';
+  }
+
+  getStateToDo(aqi: number | null): string[] {
+    const a = aqi ?? 0;
+    if (a <= 50)  return ['Outdoor exercise', 'Open windows', 'Ventilate'];
+    if (a <= 100) return ['Reduce intensity', 'Close windows', 'Purifier ON'];
+    if (a <= 150) return ['Limit outdoor time', 'Wear mask', 'Purifier MAX'];
+    if (a <= 200) return ['Avoid outdoors', 'Mask required', 'Purifier MAX'];
+    return              ['Stay indoors', 'Seal windows', 'Emergency mode'];
   }
 
   private drawStarfield(): void {

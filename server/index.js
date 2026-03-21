@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const compression = require('compression');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -11,6 +12,8 @@ const weatherRoutes = require('./routes/weather');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+app.use(compression());
 
 // Minimal CSP — replaces the unsafe contentSecurityPolicy: false
 app.use(helmet({

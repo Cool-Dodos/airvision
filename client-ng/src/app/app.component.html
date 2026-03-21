@@ -8,16 +8,20 @@
 <div *ngIf="error" class="error-banner"><span class="err-icon">ALERT</span> {{ error }}</div>
 
 <!-- Globe -->
-<app-globe-webgl
-  [aqiData]="aqiData"
-  [selectedCode]="selectedCode"
-  [focusCountry]="focusCountry"
-  [viewMode]="viewMode"
-  [showFps]="true"
-  (countryClick)="onCountryClick($event)"
-  (stateClick)="onStateClick($event)"
-  (indiaModeChange)="indiaMode = $event">
-</app-globe-webgl>
+<div class="globe-container">
+  <app-globe-webgl
+    [aqiData]="aqiData"
+    [selectedCode]="selectedCode"
+    [focusCountry]="focusCountry"
+    [viewMode]="viewMode"
+    [showFps]="true"
+    [showIndiaStates]="indiaStateMode"
+    (countryClick)="onCountryClick($event)"
+    (stateClick)="onStateClick($event)"
+    (indiaModeChange)="indiaStateMode = $event">
+  </app-globe-webgl>
+
+</div>
 
 <!-- Top-left brand -->
 <div class="header">
@@ -42,21 +46,32 @@
   (snapshotChange)="onTimeSelect($event)">
 </app-history-slider>
 
+<!-- India States Button -->
+<div class="india-states-wrap">
+<button class="india-states-btn"
+        (click)="onIndiaStatesClick()"
+        [class.active]="indiaStateMode">
+  {{ indiaStateMode ? 'Exit State View' : 'India States' }}
+</button>
+</div>
+
 <div class="social-links"></div>
 
 <!-- Layer Controls -->
 <div class="layer-controls">
-  <div class="ctrl-group">
-    <div class="selector-label">View Mode</div>
-    <select [(ngModel)]="viewMode" class="pollutant-select">
-      <option value="aqi">AQI Index</option>
-      <option value="pm25">PM2.5</option>
-      <option value="pm10">PM10</option>
-      <option value="no2">NO₂</option>
-      <option value="o3">O₃</option>
-      <option value="so2">SO₂</option>
-      <option value="co">CO</option>
-    </select>
+  <div class="glass-panel">
+    <div class="ctrl-group">
+      <div class="selector-label">View Mode</div>
+      <select [(ngModel)]="viewMode" class="pollutant-select">
+        <option value="aqi">AQI Index</option>
+        <option value="pm25">PM2.5</option>
+        <option value="pm10">PM10</option>
+        <option value="no2">NO₂</option>
+        <option value="o3">O₃</option>
+        <option value="so2">SO₂</option>
+        <option value="co">CO</option>
+      </select>
+    </div>
   </div>
 </div>
 
@@ -75,55 +90,64 @@
 </app-info-panel>
 
 <!-- State panel — rich detail for Indian states -->
-<div class="state-panel"
-     [class.panel-visible]="!!selectedState"
-     [style.border-left]="selectedState ? '2px solid ' + selectedState.col : 'none'">
+<div class="state-panel" [class.panel-visible]="!!selectedState" [style.--aqi-col]="selectedState?.col">
   <div class="panel-header" *ngIf="selectedState">
     <div class="header-actions">
-      <span class="share-btn" (click)="onStateShare()">Share</span>
-      <span class="close" (click)="onClose()">Dismiss</span>
+      <span class="action-btn" (click)="onStateShare()">SHARE</span>
+      <span class="close-btn" (click)="onClose()">✕</span>
     </div>
-    <div class="sec-label">State Level Data — India (V1.7.3 OFFLINE)</div>
   </div>
 
-  <div *ngIf="selectedState" class="panel-body">
-    <div class="state-name">{{ selectedState.name }}</div>
-    <div class="source-tag" *ngIf="selectedState.station">Station: {{ selectedState.station }}</div>
-
-    <div class="state-aqi-row">
-      <div class="aqi-box">
-        <span class="aqi-val" [style.color]="selectedState.col">{{ selectedState.aqi ?? '—' }}</span>
-        <span class="aqi-label">AQI</span>
-      </div>
-      <div class="cat-pill" [style.background]="selectedState.col + '22'" [style.color]="selectedState.col">
-        {{ selectedState.cat }}
-      </div>
-    </div>
-
-    <div class="detail-divider"></div>
-
-    <div class="detail-section">
-      <div class="sec-title">Health Recommendation</div>
-      <div class="advice-card" [style.border-color]="selectedState.col + '33'">
-        <div class="advice-main">{{ selectedState.safe }}</div>
-        <div class="advice-sub" *ngIf="selectedState.aqi !== null && selectedState.aqi > 50">
-          {{ selectedState.aqi > 150 ? 'Avoid prolonged outdoor exertion. Sensitive groups should stay indoors.' : 'Consider reducing long or intense outdoor activities if you experience symptoms.' }}
-        </div>
-        <div class="advice-sub" *ngIf="selectedState.aqi !== null && selectedState.aqi <= 50">
-          Air quality is ideal for all outdoor activities. No special precautions needed.
+  <div *ngIf="selectedState">
+    <!-- Hero -->
+    <div class="hero">
+      <h1 class="country-name">{{ selectedState.name }}</h1>
+      <div class="city-name">India State</div>
+      <div class="aqi-block">
+        <span class="aqi-number">{{ selectedState.aqi ?? '—' }}</span>
+        <div class="aqi-info">
+          <span class="aqi-status" [style.color]="selectedState.col">{{ selectedState.cat }}</span>
+          <span class="aqi-sub">TELEMETRY LIVE</span>
         </div>
       </div>
     </div>
 
-    <div class="detail-section">
-      <div class="sec-title">About this Region</div>
-      <p class="desc-text" *ngIf="selectedState.aqi === null">
-        No active monitoring stations are currently reporting data for this state.
-      </p>
-      <p class="desc-text" *ngIf="selectedState.aqi !== null">
-        Real-time telemetry from {{ selectedState.station || 'local stations' }} in {{ selectedState.name }}. 
-        Air quality index is calculated based on the latest hourly readings.
-      </p>
+    <div class="sp-divider"></div>
+
+    <!-- Health Advisory -->
+    <div class="sp-section">
+      <div class="sp-label">HEALTH ADVISORY</div>
+      <div class="adv-grid">
+        <div class="adv-item">
+          <span class="adv-group">Healthy adults</span>
+          <span class="adv-val">Limit outdoors</span>
+        </div>
+        <div class="adv-item">
+          <span class="adv-group">Sensitive groups</span>
+          <span class="adv-val">Stay indoors</span>
+        </div>
+        <div class="adv-item">
+          <span class="adv-group">Mask</span>
+          <span class="adv-val" [style.color]="getMaskColor(selectedState.aqi)">{{ getMask(selectedState.aqi) }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp-divider"></div>
+
+    <!-- Recommended Actions -->
+    <div class="sp-section">
+      <div class="sp-label">RECOMMENDED ACTIONS</div>
+      <div class="actions-row">
+        <div class="action-pill" *ngFor="let item of getStateToDo(selectedState.aqi)">{{ item }}</div>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <div class="sp-section">
+      <div class="sp-desc">
+        Regional air quality telemetry for {{ selectedState.name }} provided by local monitoring stations.
+      </div>
     </div>
   </div>
 </div>
