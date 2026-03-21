@@ -23,8 +23,8 @@
 .badge.critical-badge { background: #ff0000; }
 
 .feed-panel {
-  position: fixed; top: 380px; right: 24px; left: auto; transform: none;
-  width: 320px; max-height: 400px; overflow-y: auto;
+  position: fixed; top: 420px; right: 24px; left: auto; transform: none;
+  width: 320px; max-height: calc(100vh - 460px); overflow-y: auto;
   background: rgba(2,5,16,0.96); border: 1px solid #0d2a4a;
   border-radius: 2px; z-index: 1600;
   font-family: 'Courier New', monospace;
