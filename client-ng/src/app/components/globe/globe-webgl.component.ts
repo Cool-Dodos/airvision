@@ -7,7 +7,7 @@ import { CommonModule } from '@angular/common';
 import { aqiInfo, NUMERIC_TO_CODE } from '../../utils/aqi';
 import { safeOutdoorTime, SOURCE_TAGS } from '../../utils/health';
 import Globe from 'globe.gl';
-import { difference } from '@turf/difference';
+
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 // LOD: 110m at globe scale for 60fps, swap to 50m when zoomed in for real borders
@@ -293,6 +293,8 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
   // Globe initialisation
   // ─────────────────────────────────────────────────────────────────────────
 
+
+
   private async initGlobe(): Promise<void> {
     const mount = this.mountRef.nativeElement;
     const W = window.innerWidth;
@@ -371,43 +373,14 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
           geometry: indiaGeometry
         };
 
-        // Only working with LO now — HI is same data
         const features = this.worldFeaturesLo;
-
-        // 1. Replace India with official boundary
-        const inIdx = features.findIndex((f: any) => codeFromNumeric(f.id) === 'IN');
+        const orig = features.find((f: any) => codeFromNumeric(f.id) === 'IN');
+        const inIdx = features.indexOf(orig);
         if (inIdx !== -1) {
-          features[inIdx] = { ...features[inIdx], geometry: indiaGeometry };
+          features[inIdx] = { ...orig, id: orig.id, geometry: indiaGeometry };
         }
-
-        // 2. Clip Pakistan
-        const pkIdx = features.findIndex((f: any) => codeFromNumeric(f.id) === 'PK');
-        if (pkIdx !== -1) {
-          try {
-            // @ts-ignore: Turf v7 typings incorrectly expect 1 argument instead of 2
-            const clipped = difference({ type: 'Feature' as const, properties: {}, geometry: features[pkIdx].geometry } as any, indiaFeature as any);
-            if (clipped?.geometry) {
-              features[pkIdx] = { ...features[pkIdx], geometry: clipped.geometry };
-            }
-          } catch { console.warn('[India] PK clip failed'); }
-        }
-
-        // 3. Clip China
-        const cnIdx = features.findIndex((f: any) => codeFromNumeric(f.id) === 'CN');
-        if (cnIdx !== -1) {
-          try {
-            // @ts-ignore: Turf v7 typings incorrectly expect 1 argument instead of 2
-            const clipped = difference({ type: 'Feature' as const, properties: {}, geometry: features[cnIdx].geometry } as any, indiaFeature as any);
-            if (clipped?.geometry) {
-              features[cnIdx] = { ...features[cnIdx], geometry: clipped.geometry };
-            }
-          } catch { console.warn('[India] CN clip failed'); }
-        }
-
-        // 4. Sync HI = LO (same resolution now)
         this.worldFeaturesHi = [...features];
-
-        console.log('[India] Official boundary applied — PK and CN clipped');
+        console.log('[India] Official boundary applied');
       }
     } catch (e) {
       console.warn('[India] border fix failed:', e);
@@ -439,7 +412,9 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
         const code = codeFromNumeric(f.id);
         if (k === this.selectedKey) return ALT_SELECTED;
         if (k === this.hoveredKey)  return ALT_HOVER;
-        if (code === 'IN')          return ALT_DEFAULT + 0.002;
+        if (code === 'IN') return ALT_DEFAULT + 0.005;
+        if (code === 'PK') return ALT_DEFAULT + 0.001;
+        if (code === 'CN') return ALT_DEFAULT + 0.001;
         return ALT_DEFAULT;
       })
       .polygonLabel(() => '')
@@ -447,7 +422,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
       .onPolygonHover((f: any, _: any, e: MouseEvent) => this.onHover(f, e))
       .onPolygonClick((f: any, e: MouseEvent) => this.onClick(f, e));
 
-    this.globe.pointOfView({ lat: 20, lng: 0, altitude: 2.5 });
+    this.globe.pointOfView({ lat: INDIA_BOUNDS.latMax, lng: INDIA_BOUNDS.lngMin, altitude: 2 });
 
     // Apply ocean AFTER pointOfView — globe.gl async init is complete by now
     this.applyOceanMaterial();
@@ -788,7 +763,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
       const gj = await fetch('/assets/india-states-simplified.json').then(r => r.json());
       this.geoCache = gj.type === 'FeatureCollection' ? gj.features : [gj];
       return this.geoCache!;
-    } catch { return []; }
+    } catch (e) { return []; }
   }
 
   private async loadAqi(): Promise<Record<string, any>> {
@@ -801,7 +776,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
       clearTimeout(t);
       if (json.states) { this.aqiCache = json.states; this.aqiCachedAt = now; }
       return this.aqiCache ?? {};
-    } catch { return this.aqiCache ?? {}; }
+    } catch (e) { return this.aqiCache ?? {}; }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
