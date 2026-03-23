@@ -135,7 +135,6 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       iaqi:        (this.selectedState as any).iaqi || { pm25: this.selectedState.aqi },
     };
     this.shareData = shareData;
-    console.log('State shared:', this.shareData);
   }
 
   setShareData(d: any) {
@@ -154,7 +153,6 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onStateClick(state: any): void {
-    console.log('State clicked:', state);
     this.selectedCode = null;
     this.selectedState = state;
   }

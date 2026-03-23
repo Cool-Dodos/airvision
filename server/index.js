@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 5000;
 
 app.use(compression());
 
-// Minimal CSP — replaces the unsafe contentSecurityPolicy: false
+// Content Security Policy — whitelists only required external sources
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
@@ -37,7 +37,7 @@ app.use(helmet({
   }
 }));
 
-// CORS — origins configurable via env for staging/preview deployments
+// CORS — origins loaded from ALLOWED_ORIGINS env var or defaults to known hosts
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : [
@@ -48,13 +48,13 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
 
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 
-// Trust Render/Vercel proxy (patch 3.5)
+// Trust X-Forwarded-For from Vercel/Render proxy
 app.set('trust proxy', 1);
 
 const realIp = (req) =>
   (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) ?? req.headers['x-real-ip'] ?? req.ip;
 
-// Progressive Slowdown (patch 3.3) — deters script kids without blocking humans
+// Progressive slowdown — adds delay after 100 req/15min to deter scrapers
 const speedLimiter = slowDown({
   windowMs: 15 * 60 * 1000,
   delayAfter: 100, // start slowing after 100 req
@@ -63,7 +63,7 @@ const speedLimiter = slowDown({
 });
 app.use('/api/', speedLimiter);
 
-// Rate limiting (patch 3.1) — relaxed to 1500 for heavy dashboard loads
+// Hard rate limit — 1500 req/15min per IP
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1500,
@@ -80,7 +80,7 @@ app.use(express.json({ limit: '10kb' }));
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('MongoDB connected');
-    startCronJob(); // Safe: runs only after DB is confirmed ready
+    startCronJob(); // Start scheduled AQI polling after DB connects
   })
   .catch(err => console.error('MongoDB error:', err));
 

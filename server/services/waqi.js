@@ -3,8 +3,7 @@ const axios = require('axios');
 const BASE  = 'https://api.waqi.info';
 const TOKEN = () => process.env.WAQI_TOKEN;
 
-// Normalize state names for matching — strips diacritics, lowercases, trims
-// Use this on BOTH the key side and the GeoJSON property side to avoid mismatches
+// Strips diacritics, lowercases, and trims state names for consistent matching
 function normalizeStateName(name) {
   if (!name) return '';
   let n = name.toLowerCase()
@@ -299,11 +298,11 @@ async function fetchCountryData(code) {
     if (result) return result;
   }
   
-  // Last resort: deep search by name
+  // Last resort: full-text search by country name
   result = await searchAQI(entry.name);
   if (result) return result;
 
-  // Final attempt: search specifically for 'Kathmandu' if it's Nepal
+  // Nepal fallback: WAQI city lookup for Kathmandu
   if (code === 'NP') {
     result = await searchAQI('Kathmandu');
     if (result) return result;
@@ -379,7 +378,7 @@ const INDIA_STATES = {
   'Meghalaya':              { cities: ['Shillong'],                        geo: [25.57, 91.88] },
   'Mizoram':                { cities: ['Aizawl','Sikulpuikawn'],           geo: [23.73, 92.72] },
   'Nagaland':               { cities: ['Kohima'],                          geo: [25.67, 94.11] },
-  // FIXED: was "Orissa" — official name is "Odisha" since 2011
+  // Official name since 2011
   'Odisha':                 { cities: ['Bhubaneswar','Cuttack','Talcher'], geo: [20.30, 85.85] },
   'Puducherry':             { cities: ['Pondicherry'],                     geo: [11.94, 79.83] },
   'Punjab':                 { cities: ['Amritsar','Ludhiana','Patiala'],   geo: [31.63, 74.87] },
@@ -389,7 +388,7 @@ const INDIA_STATES = {
   'Telangana':              { cities: ['Hyderabad','Somajiguda, Hyderabad'], geo: [17.38, 78.47] },
   'Tripura':                { cities: ['Agartala'],                         geo: [23.83, 91.28] },
   'Uttar Pradesh':          { cities: ['Lucknow','Agra','Kanpur','Varanasi','Meerut'], geo: [26.85, 80.95] },
-  // FIXED: was "Uttaranchal" — official name is "Uttarakhand" since 2000
+  // Official name since 2000
   'Uttarakhand':            { cities: ['Dehradun','Haridwar'],              geo: [30.32, 78.03] },
   'West Bengal':            { cities: ['Kolkata','Asansol','Durgapur','Siliguri'], geo: [22.57, 88.36] },
 };
@@ -410,7 +409,7 @@ async function fetchIndiaStates() {
         }
         if (!data?.aqi) data = await fetchGeoAQI(cfg.geo[0], cfg.geo[1]);
         if (data?.aqi != null) {
-          // Store under normalized key so globe lookup is diacritic-tolerant
+          // Normalize key to match the frontend's normalizeState() lookup
           const key = normalizeStateName(state);
           results[key] = { aqi: data.aqi, city: data.city || cfg.cities[0], rawName: state };
         }

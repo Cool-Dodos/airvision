@@ -60,7 +60,7 @@ async function updateDailyAverages(countryData) {
     );
     const existing = await DailyAverage.findOne({ countryCode: code, date: today });
     if (existing) {
-      // Guard: prevAvg falls back to the incoming value on first upsert
+      // On first write, readingCount is 1, so prevCount becomes 0 — prevents div-by-zero
       const prevCount = Math.max(1, existing.readingCount - 1);
       const prevAvg   = existing.avgAqi ?? d.avgAqi; // null guard
       const newAvg    = (prevAvg * prevCount + d.avgAqi) / existing.readingCount;
@@ -71,7 +71,7 @@ async function updateDailyAverages(countryData) {
     }
   }
 
-  // Prune > 32 days
+  // Remove daily averages older than 32 days to bound DB growth
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 32);
   await DailyAverage.deleteMany({ date: { $lt: cutoff.toISOString().slice(0, 10) } });
@@ -86,7 +86,7 @@ async function get30DayAverage(countryCode) {
   return Math.round(avg);
 }
 
-// ── Anomaly detection — BATCH version (single DB query instead of ~190) ────
+// Detects AQI anomalies using a single batch query across all countries
 async function detectAnomalies(currentCountries) {
   const codes = Object.keys(currentCountries).filter(c => currentCountries[c]?.avgAqi != null);
   if (!codes.length) return [];
@@ -101,14 +101,14 @@ async function detectAnomalies(currentCountries) {
     date: { $gte: cutoffStr },
   }).lean();
 
-  // Group averages in memory
+  // Group per-country daily averages from the batch query result
   const baselineMap = {};
   for (const doc of dailyDocs) {
     if (!baselineMap[doc.countryCode]) baselineMap[doc.countryCode] = [];
     if (doc.avgAqi) baselineMap[doc.countryCode].push(doc.avgAqi);
   }
 
-  // For countries with no 30-day data, fall back to recent snapshots (one batch query)
+  // For countries with no daily history, fall back to the last 48 snapshots
   const missingCodes = codes.filter(c => !baselineMap[c]?.length);
   if (missingCodes.length) {
     const snaps = await AqiSnapshot.find().sort({ fetchedAt: -1 }).limit(48).lean();

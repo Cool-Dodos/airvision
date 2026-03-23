@@ -10,27 +10,24 @@ import Globe from 'globe.gl';
 
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-// LOD: 110m at globe scale for 60fps, swap to 50m when zoomed in for real borders
+// Low-detail world topology (110m) for fast globe-scale rendering
 const WORLD_URL_LO = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
-const WORLD_URL_HI = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
-const LOD_SWITCH_ALT = 1.8; // altitude threshold — below this zoom uses 50m
-const NO_DATA_COLOR = '#1a3a5a'; // was #284678 — more distinct from ocean
-const OCEAN_COLOR = '#040c1e';
+const NO_DATA_COLOR = '#1a3a5a'; // Distinct from the ocean background (#040c1e)
 const STROKE_DEFAULT = 'rgba(2,5,16,0.8)';
 const STROKE_ACTIVE = 'rgba(255,255,255,0.4)';
 const SIDE_COLOR = 'rgba(8,18,36,0.6)';
-const MAX_PIXEL_RATIO = 1.5;   // DECISION 3: cap retina pixel ratio — halves GPU load on 2x/3x DPR screens
+const MAX_PIXEL_RATIO = 1.5; // Caps device pixel ratio at 1.5 to reduce GPU load on HiDPI displays
 const ALT_DEFAULT = 0.005;
 const ALT_HOVER = 0.04;
 const ALT_SELECTED = 0.08;
 
-// India zoom thresholds
+// India viewport and cache configuration
 const INDIA_BOUNDS = { latMin: 6, latMax: 38, lngMin: 67, lngMax: 98 };
 const INDIA_ENTER_ALT = 1.3;
 const INDIA_EXIT_ALT = 1.6;
-const INDIA_AQI_TTL = 30 * 60 * 1000; // 30 min cache
+const INDIA_AQI_TTL = 30 * 60 * 1000; // 30-minute state AQI cache TTL
 
-// State name normalization (matches Canvas version)
+// Legacy and alternate state name spellings mapped to their canonical values
 const STATE_ALIASES: Record<string, string> = {
   'utranchal': 'uttarakhand', 'uttranchal': 'uttarakhand',
   'uttaranchal': 'uttarakhand', 'orissa': 'odisha',
@@ -52,10 +49,7 @@ function codeFromNumeric(id: string | number): string | undefined {
   return NUMERIC_TO_CODE[String(Number(id))];
 }
 
-function isOverIndia(lat: number, lng: number): boolean {
-  return lat > INDIA_BOUNDS.latMin && lat < INDIA_BOUNDS.latMax
-    && lng > INDIA_BOUNDS.lngMin && lng < INDIA_BOUNDS.lngMax;
-}
+
 
 function flatCoords(geometry: any): number[][] {
   const out: number[][] = [];
@@ -106,7 +100,7 @@ function flatCoords(geometry: any): number[][] {
         India — State View
       </div>
 
-    <!-- FPS counter — remove before production by passing [showFps]="false" -->
+    <!-- FPS overlay, hidden in production via [showFps]="false" -->
     <div *ngIf="showFps" class="gl-fps">{{ fps }} fps</div>
   `,
   styles: [`
@@ -144,7 +138,7 @@ function flatCoords(geometry: any): number[][] {
       border: 1px solid #1e3a58; border-radius: 2px;
       box-shadow: 0 4px 20px rgba(0,0,0,.6);
     }
-    .gl-india-hint { font-size:8px; color:#3a5a7a; margin-left:8px; }
+
 
     .gl-fps {
       position: fixed; bottom: 60px; right: 24px;
@@ -159,18 +153,18 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
   @ViewChild('mount', { static: false }) mountRef!: ElementRef<HTMLDivElement>;
   @ViewChild('stars', { static: false }) starsRef!: ElementRef<HTMLCanvasElement>;
 
-  // ── Inputs — identical signature to Canvas GlobeComponent ──────────────
+  // ── Inputs ──────────────────────────────────────────────────────────────
   @Input() aqiData: Record<string, any> = {};
   @Input() selectedCode: string | null = null;
   @Input() viewMode: 'aqi' | 'pm25' | 'pm10' | 'o3' | 'no2' | 'so2' | 'co' = 'aqi';
-  @Input() showFps = true; // set [showFps]="false" in production
+  @Input() showFps = true; // Set to false in production to hide FPS counter
   @Input() showIndiaStates: boolean = false;
 
   @Input() set focusCountry(code: string | null) {
     if (code && this.globe) this.zoomToCode(code);
   }
 
-  // ── Outputs — identical signature to Canvas GlobeComponent ─────────────
+  // ── Outputs ─────────────────────────────────────────────────────────────
   @Output() countryClick = new EventEmitter<string>();
   @Output() stateClick = new EventEmitter<{
     name: string; aqi: number | null; col: string; cat: string; safe: string; station?: string;
@@ -185,16 +179,15 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   // ── Private ─────────────────────────────────────────────────────────────
   private globe: any = null;
-  private worldFeatures: any[] = [];    // active feature set (swaps between lo/hi)
-  private worldFeaturesLo: any[] = []; // 110m — globe scale, 60fps
-  private worldFeaturesHi: any[] = []; // 50m  — zoomed in, natural borders
+  private worldFeatures: any[] = [];   // Active polygon feature set (swapped on India mode)
+  private worldFeaturesLo: any[] = []; // 110m world topology — globe scale
+  private worldFeaturesHi: any[] = []; // 50m world topology — zoomed in
   private currentLod: 'lo' | 'hi' = 'lo';
   private stateAqi: Record<string, any> = {};
   private indiaLoading = false;
 
   private colorCache = new Map<string, string>();
-  private stateFeatureKeys = new Set<string>(); // Tracks exactly which polygons are India states
-  private neighborNames = new Set(['Pakistan', 'China', 'Nepal', 'Bhutan', 'Bangladesh', 'Myanmar', 'Sri Lanka']);
+  private stateFeatureKeys = new Set<string>(); // Keys of Indian state polygons for fast membership check
   private indiaFeatures: any[] = [];
 
   private hoveredKey: string | null = null;
@@ -456,13 +449,12 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
       .onPolygonHover((f: any, _: any, e: MouseEvent) => this.onHover(f, e))
       .onPolygonClick((f: any, e: MouseEvent) => this.onClick(f, e));
 
-    // NOW rebuild cache and swap — callbacks are registered
+    // Build initial color cache after all callbacks are registered
     this.rebuildColorCache();
     this.swapPolygons();
 
     this.globe.pointOfView({ lat: INDIA_BOUNDS.latMax, lng: INDIA_BOUNDS.lngMin, altitude: 2 });
     this.applyOceanMaterial();
-    this.globe.onZoom(({ lat, lng, altitude }: any) => this.onZoom(lat, lng, altitude));
 
     // Tooltip repositioning — no detectChanges, only transform update
     mount.addEventListener('mousemove', (e: MouseEvent) => {
@@ -529,9 +521,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // DECISION 2: Color cache
-  // Rebuilt once when aqiData / viewMode / indiaMode changes.
-  // Per-frame callbacks do O(1) Map lookup — zero computation inside render loop.
+  // Color cache: rebuilt on data/mode change, O(1) lookup per render frame
   // ─────────────────────────────────────────────────────────────────────────
 
   private rebuildColorCache(): void {
@@ -557,7 +547,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
     }
   }
 
-  // Stable string key for any feature (works for both world + state GeoJSON)
+  // Returns a stable string key for a GeoJSON feature (world or state)
   private fkey(f: any): string {
     return String(f?.id ?? f?.properties?.shapeName ?? f?.properties?.name ?? '');
   }
@@ -598,7 +588,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
     } else {
       const code = codeFromNumeric(feat.id);
       if (!code) {
-        // Unknown territory — clear tooltip silently
+        // Feature has no ISO code — clear tooltip without emitting
         if (this.hoveredKey) {
           this.hoveredKey = null;
           this.tooltip = null;
@@ -629,7 +619,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
   // ─────────────────────────────────────────────────────────────────────────
 
   private onClick(feat: any, e: MouseEvent): void {
-    this.polygonClicked = !!feat; // tells canvas click listener a polygon was hit
+    this.polygonClicked = !!feat; // Prevents canvas background-click from also firing
     if (!feat) {
       if (this.selectedKey) {
         this.selectedKey = null;
@@ -658,11 +648,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
     if (!code) return;
 
     this.selectedKey = this.fkey(feat);
-    // REMOVED this.swapPolygons() to prevent synchronous 3D geometry rebuild freezing the UI.
-    // Let zoomToCode handle the geometry swap AFTER the camera animation finishes.
-
-    // Emit immediately — app.component receives code + pre-loaded aqiData snapshot
-    // This also triggers ngOnChanges which invokes zoomToCode
+    // Emit the country code; ngOnChanges will call zoomToCode and handle polygon swap
     this.zone.run(() => this.countryClick.emit(code));
   }
 
@@ -670,50 +656,42 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
   // Zoom → India mode
   // ─────────────────────────────────────────────────────────────────────────
 
-  private onZoom(lat: number, lng: number, altitude: number): void {
-    // LOD switch intentionally stripped to prevent zoom freezes
-    // State mode is now explicitly triggered via UI button, NOT by zoom.
-  }
+
 
   // ─────────────────────────────────────────────────────────────────────────
-  // DECISION 4: India state mode — swap, never overlap
+  // India state mode: replaces the country polygon with state-level polygons
   // ─────────────────────────────────────────────────────────────────────────
 
   private async enterIndia(): Promise<void> {
-    console.log('[GlobeWebGL] enterIndia() triggered. current mode:', this.indiaMode, 'loading:', this.indiaLoading);
     if (this.indiaMode || this.indiaLoading) return;
     this.indiaLoading = true;
 
     try {
-      console.log('[GlobeWebGL] Fetching states and AQI...');
       const [features, rawAqi] = await Promise.all([this.loadGeo(), this.loadAqi()]);
-      console.log('[GlobeWebGL] Data fetched. Features:', features?.length, 'AQI count:', Object.keys(rawAqi || {}).length);
 
       if (this.indiaMode) {
-        console.warn('[GlobeWebGL] Already in mode, aborting swap');
         this.indiaLoading = false;
         return;
       }
 
       const DISPUTED = [
-        'jammu & kashmir (disputed)', // only filter the generic topological artifact
+        'jammu & kashmir (disputed)', // Topological artifact present in some GeoJSON sources
       ];
       this.indiaFeatures = features.filter((f: any) => {
         const name = (f.properties?.shapeName || f.properties?.name || '').toLowerCase();
         return !DISPUTED.some(d => name.includes(d));
       });
-      console.log('[India after filter]', this.indiaFeatures.map((f: any) => f.properties?.shapeName || f.properties?.name));
 
-      // Normalize stateAqi keys once on load
+      // Normalize all state keys to enable diacritic-tolerant lookup
       this.stateAqi = {};
       for (const [k, v] of Object.entries(rawAqi)) {
         this.stateAqi[normalizeState(k)] = v;
       }
 
-      // Populate reliable state detection set
+      // Track which polygon keys belong to Indian states
       this.stateFeatureKeys = new Set(this.indiaFeatures.map(f => this.fkey(f)));
 
-      // Stop rotation for state mode
+      // Stop auto-rotation for state mode
       const ctrl = this.globe?.controls();
       if (ctrl) {
         ctrl.autoRotate = false;
@@ -738,7 +716,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.hoveredKey = null;
     this.stateFeatureKeys.clear();
 
-    // Resume rotation on exit
+    // Resume auto-rotation on state mode exit
     const ctrl = this.globe?.controls();
     if (ctrl) {
       ctrl.autoRotate = true;

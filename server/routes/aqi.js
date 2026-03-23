@@ -8,7 +8,7 @@ const { fetchSingleCountry, fetchMapBounds, fetchIndiaStates, COUNTRY_CITIES } =
 const { getTrend, detectAnomalies, get30DayAverage } = require('../services/analytics');
 const { getCachedAnomalies } = require('../services/cron');
 
-// Tighter limiter for expensive routes (patch 3.2)
+// Strict rate limiter for expensive live-fetch routes: 10 req/min per IP
 const realIp = (req) =>
   (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) ?? req.headers['x-real-ip'] ?? req.ip;
 
@@ -99,7 +99,7 @@ router.get('/stations', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// India states local cache removed for MongoDB-based StateSnapshot (patch 3.1.4)
+
 
 // GET /api/aqi/india/states — state-level AQI for India drill-down
 router.get('/india/states', async (req, res) => {
@@ -133,7 +133,7 @@ router.get('/snapshots', async (req, res) => {
   try {
     const snapshots = await AqiSnapshot.find({}, 'fetchedAt')
       .sort({ fetchedAt: -1 })
-      .limit(96) // Hard cap: 96 × 15min = 24h of history
+      .limit(96) // 96 snapshots at 15min intervals = 24h of history
       .lean();
     res.set('Cache-Control', 'public, max-age=60');
     res.json(snapshots.map(s => ({ timestamp: s.fetchedAt })));
@@ -194,11 +194,11 @@ router.get('/boundaries/:iso2', async (req, res) => {
   }
 });
 
-// Honeypot — logs any automated scrapers that enumerate routes (patch 3.4)
+// Honeypot route — logs client IP for automated API enumeration detection
 router.get('/global-stats-v2', (req, res) => {
   const ip = req.headers['x-forwarded-for']?.split(',')[0] ?? req.ip;
   console.warn('[HONEYPOT] Suspicious client:', ip, req.headers['user-agent']);
-  res.json({ count: 0, data: [] }); // Plausible empty response
+  res.json({ count: 0, data: [] }); // Empty but valid response to avoid tipping off scanners
 });
 
 module.exports = router;
