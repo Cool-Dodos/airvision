@@ -7,7 +7,6 @@
 [![WebGL](https://img.shields.io/badge/WebGL-globe.gl-FF6B35?style=flat-square&logo=webgl&logoColor=white)](https://globe.gl)
 [![TopoJSON](https://img.shields.io/badge/TopoJSON-topojson--client-lightgrey?style=flat-square)](https://github.com/topojson/topojson)
 [![Vercel](https://img.shields.io/badge/Deployed-Vercel-000000?style=flat-square&logo=vercel&logoColor=white)](https://airvision-seven.vercel.app)
-[![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
 AirVision Global is a high-performance 3D globe platform that monitors real-time air quality (AQI) across every country on Earth — and down to India's 36 states and union territories. Built on a MEAN stack with a WebGL-powered globe renderer, it delivers a seamless, data-rich experience for tracking environmental health at global and regional scale.
 
@@ -17,7 +16,7 @@ AirVision Global is a high-performance 3D globe platform that monitors real-time
 
 ## Features
 
-### 🌐 WebGL 3D Globe
+###  WebGL 3D Globe
 - Real-time AQI coloring across 177+ countries using a 6-tier color scale
 - 60fps rendering with pixel ratio capping for retina and mobile performance
 - Auto-rotating globe with smooth orbit controls
@@ -25,21 +24,18 @@ AirVision Global is a high-performance 3D globe platform that monitors real-time
 - Hardcoded centroids for large MultiPolygon countries (US, Russia, China, Canada, Australia)
 - India official boundary geometry applied at runtime — includes POK and Aksai Chin
 
-### 🇮🇳 India State Mode
+###  India State Mode
 - Dedicated "India States" button — explicit trigger, never auto-fires on zoom
 - State-level AQI for all 36 states and union territories
-- Neighbor countries dimmed via WebGL polygon color callbacks
-- State polygons elevated above neighbors via altitude stacking to prevent z-fighting
-- Disputed territory handling — Jammu & Kashmir artifacts filtered from render set
 
-### 📊 Data & Analytics
+###  Data & Analytics
 - Live world AQI refresh every 2 minutes
 - Time Travel slider — replay historical AQI snapshots
 - Anomaly feed — surfaces countries with critically elevated AQI in real time
 - Country detail panel — sparkline trend, pollutant breakdown (PM2.5, PM10, NO₂, O₃, SO₂, CO), health advisory
 - Share card — copy, Web Share API, Twitter, WhatsApp
 
-### ⚡ Performance
+###  Performance
 - Angular `OnPush` change detection throughout
 - Color cache rebuilt only on data or viewMode change — O(1) per-frame polygon lookup
 - Zone-decoupled event listeners — mousemove and zoom handlers run outside Angular zone
@@ -115,8 +111,4 @@ airvision/
 
 PRs welcome. For major changes please open an issue first to discuss what you'd like to change.
 
----
 
-## License
-
-MIT © [Cool-Dodos](https://github.com/Cool-Dodos)
