@@ -98,15 +98,6 @@ airvision/
 
 ---
 
-## Known Limitations
-
-- World geometry at 110m resolution — minor border imprecision at extreme zoom
-- Somalia coastline simplified at runtime to fix earcut triangulation artifact
-- Backend on Render free tier — cold start ~30s after inactivity
-- India state AQI coverage varies by state monitoring station density
-
----
-
 ## Contributing
 
 PRs welcome. For major changes please open an issue first to discuss what you'd like to change.
