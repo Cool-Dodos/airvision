@@ -65,7 +65,7 @@ router.get('/history/:code', async (req, res) => {
 });
 
 // GET /api/aqi/anomalies — countries 80%+ above 30-day baseline
-router.get('/anomalies', expensiveLimiter, async (req, res) => {
+router.get('/anomalies', async (req, res) => {
   try {
     const { anomalies, cachedAt } = getCachedAnomalies();
     if (!anomalies.length) {
