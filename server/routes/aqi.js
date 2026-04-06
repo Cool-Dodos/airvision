@@ -110,11 +110,28 @@ router.get('/india/states', async (req, res) => {
     // Check MongoDB for latest snapshot
     const latest = await StateSnapshot.findOne({ countryCode: 'IN' }).sort({ fetchedAt: -1 }).lean();
     
-    if (latest && (now - latest.fetchedAt < TTL)) {
-      return res.json({ ok: true, count: Object.keys(latest.states).length, states: latest.states, source: 'cache_db' });
+    if (latest) {
+      if (now - latest.fetchedAt < TTL) {
+        return res.json({ ok: true, count: Object.keys(latest.states).length, states: latest.states, source: 'cache_db' });
+      } else {
+        // Stale data: Return immediately to prevent Vercel 10s timeouts, then fetch in background
+        res.json({ ok: true, count: Object.keys(latest.states).length, states: latest.states, source: 'cache_db_stale' });
+        
+        // Background refresh
+        fetchIndiaStates().then(async states => {
+          if (Object.keys(states).length > 0) {
+            await StateSnapshot.create({
+              countryCode: 'IN',
+              states: states,
+              fetchedAt: new Date()
+            });
+          }
+        }).catch(err => console.error('Background fetch failed for India states:', err.message));
+        return;
+      }
     }
 
-    // Fetch fresh if none found or expired
+    // Fetch fresh if NO data AT ALL exists
     const states = await fetchIndiaStates();
     if (Object.keys(states).length > 0) {
       await StateSnapshot.create({

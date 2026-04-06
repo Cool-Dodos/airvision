@@ -10,6 +10,7 @@ import * as d3 from 'd3';
 import * as topojson from 'topojson-client';
 import { aqiInfo, NUMERIC_TO_CODE } from '../../utils/aqi';
 import { safeOutdoorTime, SOURCE_TAGS } from '../../utils/health';
+import { environment } from '../../../environments/environment';
 
 const WORLD_50M = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json';
 const INDIA_ID = 356;
@@ -81,7 +82,7 @@ async function fetchBoundary(iso2: string): Promise<any | null> {
   try {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), 15000);
-    const feat = await fetch(`/api/aqi/boundaries/${iso2}`, { signal: controller.signal }).then(r => r.json());
+    const feat = await fetch(`${environment.apiUrl}/aqi/boundaries/${iso2}`, { signal: controller.signal }).then(r => r.json());
     clearTimeout(id);
     boundaryCache[iso2] = feat;
     return feat;
@@ -105,7 +106,7 @@ async function loadIndiaStateAqi(): Promise<Record<string, any>> {
   try {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), 30000);
-    const json = await fetch('/api/aqi/india/states', { signal: controller.signal }).then(r => r.json());
+    const json = await fetch(`${environment.apiUrl}/aqi/india/states`, { signal: controller.signal }).then(r => r.json());
     clearTimeout(id);
     if (json.states) {
       indiaStateAqiCached = json.states;
@@ -313,7 +314,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     Promise.all([
       d3.json(WORLD_50M),
       fetch('assets/india-official.json').then(r => r.json()),
-      fetch('/api/aqi/boundaries/AF').then(r => r.json()).catch(() => null),
+      fetch(`${environment.apiUrl}/aqi/boundaries/AF`).then(r => r.json()).catch(() => null),
     ]).then(([world, india, afghanistan]: [any, any, any]) => {
       this.indiaGeometry = india.geometry;
       officialIndiaGeo = india.geometry;
@@ -526,9 +527,6 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
 
     const showLabels = this.scale >= this.BASE * LABEL_SCALE;
 
-    // ── FIX 1 (Back-face culling) + FIX 2 (single pass fill+stroke) ─────────
-    // Each feature is drawn in ONE pass: path → fill → stroke.
-    // drawAllBorders() is removed — it was doubling canvas work every frame.
     for (const feat of this.worldFeatures) {
       if (String(feat.id) === String(INDIA_ID)) continue;
 

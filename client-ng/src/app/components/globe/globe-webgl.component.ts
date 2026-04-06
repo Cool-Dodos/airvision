@@ -6,6 +6,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { aqiInfo, NUMERIC_TO_CODE } from '../../utils/aqi';
 import { safeOutdoorTime, SOURCE_TAGS } from '../../utils/health';
+import { environment } from '../../../environments/environment';
 import Globe from 'globe.gl';
 
 
@@ -804,7 +805,7 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 30_000);
-      const json = await fetch('/api/aqi/india/states', { signal: ctrl.signal }).then(r => r.json());
+      const json = await fetch(`${environment.apiUrl}/aqi/india/states`, { signal: ctrl.signal }).then(r => r.json());
       clearTimeout(t);
       if (json.states) { this.aqiCache = json.states; this.aqiCachedAt = now; }
       return this.aqiCache ?? {};

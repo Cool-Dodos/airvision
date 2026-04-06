@@ -1,7 +1,8 @@
 const cron = require('node-cron');
-const { fetchAllCountries } = require('./waqi');
+const { fetchAllCountries, fetchIndiaStates } = require('./waqi');
 const { updateDailyAverages, detectAnomalies } = require('./analytics');
 const AqiSnapshot = require('../models/AqiSnapshot');
+const StateSnapshot = require('../models/StateSnapshot');
 
 let cachedAnomalies = [];
 let anomalyCachedAt = null;
@@ -10,7 +11,20 @@ function getCachedAnomalies() { return { anomalies: cachedAnomalies, cachedAt: a
 async function runFetch() {
   console.log(`[${new Date().toISOString()}] AQI fetch started...`);
   try {
-    const countryData = await fetchAllCountries();
+    // Fetch global and India state data in parallel
+    const [countryData, indiaStates] = await Promise.all([
+      fetchAllCountries(),
+      fetchIndiaStates()
+    ]);
+
+    if (Object.keys(indiaStates).length > 0) {
+      await StateSnapshot.create({
+        countryCode: 'IN',
+        states: indiaStates,
+        fetchedAt: new Date()
+      });
+    }
+
     const lastSnapshot = await AqiSnapshot.findOne().sort({ fetchedAt: -1 });
     const countryAverages = new Map();
 
@@ -41,7 +55,10 @@ async function runFetch() {
     const old = await AqiSnapshot.find().sort({ fetchedAt: -1 }).skip(48);
     if (old.length) await AqiSnapshot.deleteMany({ _id: { $in: old.map(o => o._id) } });
 
-    console.log(`[${new Date().toISOString()}] Done — ${countryAverages.size} countries, ${cachedAnomalies.length} anomalies`);
+    const oldStates = await StateSnapshot.find().sort({ fetchedAt: -1 }).skip(48);
+    if (oldStates.length) await StateSnapshot.deleteMany({ _id: { $in: oldStates.map(o => o._id) } });
+
+    console.log(`[${new Date().toISOString()}] Done — ${countryAverages.size} countries, ${Object.keys(indiaStates).length} India states, ${cachedAnomalies.length} anomalies`);
   } catch (err) {
     console.error('Cron fetch error:', err.message);
   }

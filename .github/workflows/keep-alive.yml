@@ -1,0 +1,17 @@
+name: Keep Render Backend Alive
+
+on:
+  schedule:
+    # Run every 10 minutes to prevent Render free tier from spinning down
+    - cron: "*/10 * * * *"
+  # Allow manual trigger as well
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend API
+        run: |
+          curl -s https://airvision-xcg9.onrender.com/ > /dev/null
+          echo "Pinged Render API successfully!"
