@@ -1,23 +1,11 @@
 const express = require('express');
 const router  = express.Router();
 const axios   = require('axios');
-const rateLimit = require('express-rate-limit');
 const AqiSnapshot     = require('../models/AqiSnapshot');
 const StateSnapshot   = require('../models/StateSnapshot');
 const { fetchSingleCountry, fetchMapBounds, fetchIndiaStates, COUNTRY_CITIES } = require('../services/waqi');
 const { getTrend, detectAnomalies, get30DayAverage } = require('../services/analytics');
 const { getCachedAnomalies } = require('../services/cron');
-
-// Strict rate limiter for expensive live-fetch routes: 10 req/min per IP
-const realIp = (req) =>
-  (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) ?? req.headers['x-real-ip'] ?? req.ip;
-
-const expensiveLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 10,
-  keyGenerator: realIp,
-  message: { error: 'Please wait before requesting this data again.' }
-});
 
 // GET /api/aqi/world — latest snapshot for all countries
 router.get('/world', async (req, res) => {

@@ -2,15 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const compression = require('compression');
 const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const slowDown = require('express-slow-down');
 const mongoose = require('mongoose');
 const { startCronJob } = require('./services/cron');
 const aqiRoutes = require('./routes/aqi');
 const weatherRoutes = require('./routes/weather');
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 // Trust X-Forwarded-For from Vercel/Render proxy
 app.set('trust proxy', true);
 
