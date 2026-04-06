@@ -11,12 +11,8 @@ const aqiRoutes = require('./routes/aqi');
 const weatherRoutes = require('./routes/weather');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
-
-app.use(compression());
-
 // Trust X-Forwarded-For from Vercel/Render proxy
-app.set('trust proxy', 1);
+app.set('trust proxy', true);
 
 // CORS — Allowing your Vercel domains explicitly
 const ALLOWED_ORIGINS = [
@@ -30,12 +26,11 @@ app.use(cors({
     if (!origin || ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error(`Origin ${origin} not allowed by CORS`));
     }
   },
   credentials: true 
 }));
-
 
 const realIp = (req) =>
   (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) ?? req.headers['x-real-ip'] ?? req.ip;
@@ -43,6 +38,12 @@ const realIp = (req) =>
 // Request body limit — prevents large payload attacks
 app.use(express.json({ limit: '10kb' }));
 
+// Health check — visible at /api/ping
+app.get('/api/ping', (req, res) => res.json({ 
+  status: 'ok', 
+  ip: realIp(req), 
+  timestamp: new Date().toISOString() 
+}));
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
@@ -71,5 +72,6 @@ app.use((err, req, res, next) => {
     ...(isProd ? {} : { stack: err.stack })
   });
 });
+
 
 app.listen(PORT, () => console.log(`AirVision server running on port ${PORT}`));
