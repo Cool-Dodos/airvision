@@ -25,14 +25,13 @@ const NO_DATA_STROKE = '#1e3250';
 const GRAT_COLOR = '#091520';
 const SPHERE_STROKE = '#0a1e3a';
 
-// ── FIX 1: Back-face culling helper ─────────────────────────────────────────
-// Returns true if the feature centroid is facing the viewer (within 90° of
-// the projection's current rotation point). Invisible features are skipped
-// entirely — no path() call, no projection math, no canvas state change.
-// This eliminates ~40-50% of per-frame work on a typical globe view.
+// Back-face culling: returns true if the feature centroid faces the viewer.
+// Features on the far side of the globe are skipped entirely —
+// no path calculation, no canvas state change.
+// This eliminates ~40–50% of per-frame draw work on a typical globe view.
 function isFacingViewer(centroid: [number, number], rotation: [number, number, number]): boolean {
   const angle = d3.geoDistance(centroid, [-rotation[0], -rotation[1]]);
-  // Use HALF_PI + small buffer so edge countries aren't clipped too aggressively
+  // Add a small buffer so countries near the edge aren't clipped too aggressively
   return angle < HALF_PI + 0.35;
 }
 
@@ -129,8 +128,8 @@ async function loadIndiaStateAqi(): Promise<Record<string, any>> {
   (keydown)="onKeydown($event)"
 ></canvas>
 
-<!-- FIX 5: Tooltip uses CSS transform instead of left/top bindings -->
-<!-- This avoids triggering Angular's host-element layout on every mouse pixel -->
+<!-- Tooltip uses CSS transform instead of left/top bindings -->
+<!-- This avoids triggering Angular layout recalculation on every mouse movement -->
 <div *ngIf="tooltip" class="tooltip"
   [style.transform]="tooltipTransform">
   <div class="health-bar" [style.background]="tooltip.col"></div>
@@ -215,7 +214,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   @Output() indiaModeChange = new EventEmitter<boolean>();
 
   tooltip: { name: string; aqi: number | null; col: string; cat: string; safe: string; src?: string } | null = null;
-  // FIX 5: single string binding for transform — avoids Angular binding two style props per frame
+  // Single string binding for tooltip position — avoids Angular binding two separate style properties per frame
   tooltipTransform = '';
   loadingBoundary = false;
   indiaMode = false;
@@ -239,7 +238,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   private hoveredId: number | string | null = null;
   private hoveredState: string | null = null;
 
-  // FIX 4: Pre-computed centroids — d3.geoCentroid is expensive and static per feature
+  // Pre-computed centroids — d3.geoCentroid is expensive to call per-frame; centroids are static after load
   private featureCentroids: Map<any, [number, number]> = new Map();
   private stateCentroids: Map<any, [number, number]> = new Map();
 
@@ -260,9 +259,9 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
   private lastMouseY = 0;
   private mouseRafPending = false;
 
-  // FIX 3: CD throttle — track which entity was last reported to Angular so
-  // we only call detectChanges() when the hovered target actually changes,
-  // not on every pixel of mouse movement within the same country.
+  // Change detection throttle — tracks the last entity reported to Angular
+  // so detectChanges() is only called when the hovered country/state changes,
+  // not on every pixel of mouse movement.
   private lastReportedHoverId: number | string | null = null;
   private lastReportedHoverState: string | null = null;
 
@@ -346,10 +345,9 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       this.ready = true;
       this.dirty = true;
 
-      // FIX 2: Single RAF loop — draw() and drawPick() are both called here.
-      // handleHover NO LONGER calls draw() or drawPick(). This eliminates the
-      // double-render bug where both the animation loop and the hover handler
-      // could draw in the same frame.
+      // Single animation loop — draw() and drawPick() are both called here.
+      // handleHover does not call draw() directly, which prevents
+      // double-render scenarios where two draws could occur in the same frame.
       const loop = () => {
         if (this.autoRot) {
           const [λ, φ] = this.proj.rotate();
@@ -530,8 +528,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     for (const feat of this.worldFeatures) {
       if (String(feat.id) === String(INDIA_ID)) continue;
 
-      // BACK-FACE CULLING: skip features whose centroid faces away from viewer.
-      // Saves ~40-50% of all path() calls per frame.
+      // Skip features whose centroid is on the far side of the globe (back-face culling)
       const centroid = this.featureCentroids.get(feat);
       if (centroid && !isFacingViewer(centroid, rotation as [number, number, number])) continue;
 
@@ -552,7 +549,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
         fill = aqiInfo(data.avgAqi).col + '44';
       }
 
-      // FIX 6: Neighbor clip only when zoomed in — saves expensive save/restore at globe scale
+      // Countries bordering India get clipping only when zoomed in — canvas save/restore is expensive at globe scale
       if (this.neighborFeatures.has(String(feat.id))) {
         if (this.scale > this.BASE * 2.5) {
           ctx.save();
@@ -702,8 +699,7 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
       ctx.stroke(); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
     }
 
-    // NOTE: drawAllBorders() is intentionally removed.
-    // Borders are now drawn inline in the single-pass loop above.
+    // Borders are drawn inline in the feature loop above for performance.
   }
 
   private precomputeNeighborClips(features: any[]): void {
@@ -738,10 +734,9 @@ export class GlobeComponent implements AfterViewInit, OnDestroy, OnChanges {
     }
   }
 
-  // FIX 2 + 3: handleHover no longer calls draw() or drawPick().
-  // FIX 3: cdr.detectChanges() is only called when the HOVERED ENTITY changes,
-  // not on every mouse pixel. Position updates are handled via tooltipTransform
-  // (a single string), which Angular can update cheaply without full CD.
+  // Hover handler: uses the pick canvas for O(1) hit detection via pixel color lookup.
+  // detectChanges() is only triggered when the hovered entity changes, not on every pixel.
+  // Tooltip position is updated via a CSS transform string, which is cheaper than full CD.
   private handleHover(clientX: number, clientY: number): void {
     if (!this.ready) return;
 

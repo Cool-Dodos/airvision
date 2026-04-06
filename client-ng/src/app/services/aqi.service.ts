@@ -6,10 +6,9 @@ import { environment }        from '../../environments/environment';
 @Injectable({ providedIn: 'root' })
 export class AqiService {
 
-  // Single source of truth: reads from Angular environment.ts
-  // environment.apiUrl = 'https://airvision-xcg9.onrender.com/api' in production
-  // environment.apiUrl = 'http://localhost:5000/api' in development
-  // This replaces the fragile window.location.hostname !== 'localhost' check.
+  // Base URL sourced from Angular environment config.
+  // In production: '/api' (Vercel proxy rewrites to Render backend)
+  // In development: 'http://localhost:5000/api'
   private readonly base = environment.apiUrl;
 
   constructor(private http: HttpClient) {}
