@@ -10,14 +10,14 @@
   },
   "private": true,
   "dependencies": {
-    "@angular/animations": "^17.3.0",
-    "@angular/common": "^17.3.0",
-    "@angular/compiler": "^17.3.0",
-    "@angular/core": "^17.3.0",
-    "@angular/forms": "^17.3.0",
-    "@angular/platform-browser": "^17.3.0",
-    "@angular/platform-browser-dynamic": "^17.3.0",
-    "@angular/router": "^17.3.0",
+    "@angular/animations": "~17.3.12",
+    "@angular/common": "~17.3.12",
+    "@angular/compiler": "~17.3.12",
+    "@angular/core": "~17.3.12",
+    "@angular/forms": "~17.3.12",
+    "@angular/platform-browser": "~17.3.12",
+    "@angular/platform-browser-dynamic": "~17.3.12",
+    "@angular/router": "~17.3.12",
     "@turf/clean-coords": "^7.3.4",
     "@turf/difference": "^7.3.4",
     "@turf/helpers": "^7.3.4",
@@ -31,9 +31,9 @@
     "zone.js": "~0.14.3"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "^17.3.17",
-    "@angular/cli": "^17.3.17",
-    "@angular/compiler-cli": "^17.3.0",
+    "@angular-devkit/build-angular": "~17.3.11",
+    "@angular/cli": "~17.3.11",
+    "@angular/compiler-cli": "~17.3.12",
     "@types/d3": "^7.4.3",
     "@types/jasmine": "~5.1.0",
     "@types/topojson-client": "^3.1.5",
@@ -44,5 +44,19 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
     "typescript": "~5.4.2"
+  },
+  "overrides": {
+    "braces": "^3.0.3",
+    "micromatch": "^4.0.8",
+    "ws": "^8.17.1",
+    "ajv": "^8.17.1",
+    "serialize-javascript": "^7.0.5",
+    "tar": "^7.5.13",
+    "fast-xml-parser": "^4.4.1",
+    "picomatch": "^4.0.4",
+    "esbuild": "^0.24.2",
+    "http-proxy-middleware": "^2.0.7",
+    "path-to-regexp": "^0.1.10",
+    "webpack": "^5.94.0"
   }
 }
