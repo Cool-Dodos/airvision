@@ -15,16 +15,11 @@ const PORT = process.env.PORT || 5000;
 
 app.use(compression());
 
-// Security Middleware — Helmet with relaxed CSP for initial debugging
-app.use(helmet({
-  crossOriginResourcePolicy: false, 
-  contentSecurityPolicy: false,
-}));
+// Trust X-Forwarded-For from Vercel/Render proxy
+app.set('trust proxy', 1);
 
-// CORS — origins loaded from ALLOWED_ORIGINS env var or defaults to a safe set
-const envOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) : [];
+// CORS — Allowing your Vercel domains explicitly
 const ALLOWED_ORIGINS = [
-  ...envOrigins,
   'https://airvision-seven.vercel.app',
   'https://airvision.vercel.app',
   'http://localhost:4200',
@@ -32,9 +27,7 @@ const ALLOWED_ORIGINS = [
 
 app.use(cors({ 
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    if (ALLOWED_ORIGINS.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -43,35 +36,13 @@ app.use(cors({
   credentials: true 
 }));
 
-// Trust X-Forwarded-For from Vercel/Render proxy
-app.set('trust proxy', 1);
-
 
 const realIp = (req) =>
   (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) ?? req.headers['x-real-ip'] ?? req.ip;
 
-// Progressive slowdown — adds delay after 100 req/15min to deter scrapers
-const speedLimiter = slowDown({
-  windowMs: 15 * 60 * 1000,
-  delayAfter: 100, // start slowing after 100 req
-  delayMs: (used) => (used - 100) * 100, // +100ms per req above 100
-  keyGenerator: realIp,
-});
-app.use('/api/', speedLimiter);
-
-// Hard rate limit — 1500 req/15min per IP
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 1500,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: realIp,
-  message: { error: 'Too many requests, please slow down.' }
-});
-app.use('/api/', limiter);
-
 // Request body limit — prevents large payload attacks
 app.use(express.json({ limit: '10kb' }));
+
 
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
