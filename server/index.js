@@ -15,26 +15,10 @@ const PORT = process.env.PORT || 5000;
 
 app.use(compression());
 
-// Content Security Policy — whitelists only required external sources
+// Security Middleware — Helmet with relaxed CSP for initial debugging
 app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", 'data:', 'blob:', 'cdn.jsdelivr.net'],
-      connectSrc: [
-        "'self'",
-        'https://api.waqi.info',
-        'https://www.geoboundaries.org',
-        'https://api.open-meteo.com',
-        'https://cdn.jsdelivr.net',
-      ],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-    }
-  }
+  crossOriginResourcePolicy: false, 
+  contentSecurityPolicy: false,
 }));
 
 // CORS — origins loaded from ALLOWED_ORIGINS env var or defaults to a safe set
@@ -46,10 +30,22 @@ const ALLOWED_ORIGINS = [
   'http://localhost:4200',
 ];
 
-app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
+app.use(cors({ 
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true 
+}));
 
 // Trust X-Forwarded-For from Vercel/Render proxy
 app.set('trust proxy', 1);
+
 
 const realIp = (req) =>
   (req.headers['x-forwarded-for']?.split(',')[0]?.trim()) ?? req.headers['x-real-ip'] ?? req.ip;
