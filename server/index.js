@@ -37,14 +37,14 @@ app.use(helmet({
   }
 }));
 
-// CORS — origins loaded from ALLOWED_ORIGINS env var or defaults to known hosts
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-  : [
-    'https://airvision-seven.vercel.app',
-    'https://airvision.vercel.app',
-    'http://localhost:4200',
-  ];
+// CORS — origins loaded from ALLOWED_ORIGINS env var or defaults to a safe set
+const envOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()) : [];
+const ALLOWED_ORIGINS = [
+  ...envOrigins,
+  'https://airvision-seven.vercel.app',
+  'https://airvision.vercel.app',
+  'http://localhost:4200',
+];
 
 app.use(cors({ origin: ALLOWED_ORIGINS, credentials: true }));
 
@@ -88,5 +88,21 @@ app.use('/api/aqi', aqiRoutes);
 app.use('/api/weather', weatherRoutes);
 
 app.get('/', (req, res) => res.json({ name: 'AirVision API', status: 'online' }));
+
+// ─── Global Error Handler ──────────────────────────────────────────────────
+// Prevents information leakage by masking stack traces in production
+app.use((err, req, res, next) => {
+  const status = err.status || 500;
+  const isProd = process.env.NODE_ENV === 'production';
+  
+  // Log full error on server for debugging
+  console.error(`[ERROR] ${req.method} ${req.url}:`, err.stack || err.message || err);
+
+  res.status(status).json({
+    ok: false,
+    error: isProd ? 'Internal Server Error' : (err.message || 'An unexpected error occurred'),
+    ...(isProd ? {} : { stack: err.stack })
+  });
+});
 
 app.listen(PORT, () => console.log(`AirVision server running on port ${PORT}`));
