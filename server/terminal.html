@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>AirVision DB Inspector</title>
@@ -25,7 +26,11 @@
       --btn-active-bg: #2a2924;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
       background: var(--bg-main);
@@ -67,7 +72,12 @@
       border: 1px solid var(--border);
       background: var(--bg-card);
     }
-    .prompt { color: var(--accent-dim); font-size: 14px; }
+
+    .prompt {
+      color: var(--accent-dim);
+      font-size: 14px;
+    }
+
     input[type="text"] {
       background: var(--bg-sidebar);
       border: 1px solid var(--border);
@@ -79,10 +89,21 @@
       outline: none;
       border-radius: 2px;
     }
-    input[type="text"]::placeholder { color: var(--text-dim); }
-    input[type="text"]:focus { border-color: var(--accent-dim); }
 
-    .buttons { display: flex; gap: 6px; flex-shrink: 0; }
+    input[type="text"]::placeholder {
+      color: var(--text-dim);
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent-dim);
+    }
+
+    .buttons {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
     .btn {
       background: transparent;
       border: 1px solid var(--border);
@@ -95,7 +116,12 @@
       letter-spacing: 1px;
       transition: all 0.15s;
     }
-    .btn:hover { border-color: var(--accent-dim); color: var(--text); }
+
+    .btn:hover {
+      border-color: var(--accent-dim);
+      color: var(--text);
+    }
+
     .btn.active {
       background: var(--btn-active-bg);
       border-color: var(--accent-dim);
@@ -144,7 +170,12 @@
       overflow-y: auto;
       flex: 1;
     }
-    table { width: 100%; border-collapse: collapse; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
     th {
       position: sticky;
       top: 0;
@@ -161,18 +192,37 @@
       user-select: none;
       white-space: nowrap;
     }
-    th:hover { color: var(--accent); }
-    th.sorted { color: var(--accent); }
-    th.sorted::after { content: ' ▾'; }
-    th.sorted.asc::after { content: ' ▴'; }
+
+    th:hover {
+      color: var(--accent);
+    }
+
+    th.sorted {
+      color: var(--accent);
+    }
+
+    th.sorted::after {
+      content: ' ▾';
+    }
+
+    th.sorted.asc::after {
+      content: ' ▴';
+    }
+
     td {
       padding: 5px 10px;
       border-bottom: 1px solid rgba(61, 58, 92, 0.3);
       font-size: 12px;
       white-space: nowrap;
     }
-    tr:hover { background: rgba(155, 142, 196, 0.06); }
-    tr.clickable { cursor: pointer; }
+
+    tr:hover {
+      background: rgba(155, 142, 196, 0.06);
+    }
+
+    tr.clickable {
+      cursor: pointer;
+    }
 
     /* Events log */
     .events-scroll {
@@ -184,13 +234,39 @@
       flex-direction: column;
       gap: 3px;
     }
-    .evt { display: flex; gap: 6px; font-size: 11px; line-height: 1.4; }
-    .evt-time { color: var(--text-dim); flex-shrink: 0; }
-    .evt-icon { flex-shrink: 0; }
-    .evt-msg { color: var(--text); word-break: break-all; }
-    .ico-ok { color: var(--good); }
-    .ico-warn { color: var(--warn); }
-    .ico-err { color: var(--haz); }
+
+    .evt {
+      display: flex;
+      gap: 6px;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .evt-time {
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .evt-icon {
+      flex-shrink: 0;
+    }
+
+    .evt-msg {
+      color: var(--text);
+      word-break: break-all;
+    }
+
+    .ico-ok {
+      color: var(--good);
+    }
+
+    .ico-warn {
+      color: var(--warn);
+    }
+
+    .ico-err {
+      color: var(--haz);
+    }
 
     /* Detail section under table */
     .detail-bar {
@@ -204,10 +280,27 @@
       max-height: 140px;
       overflow-y: auto;
     }
-    .detail-bar.open { display: flex; }
-    .detail-col { display: flex; flex-direction: column; gap: 4px; }
-    .detail-label { color: var(--text-dim); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; }
-    .detail-val { color: var(--text-bright); }
+
+    .detail-bar.open {
+      display: flex;
+    }
+
+    .detail-col {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .detail-label {
+      color: var(--text-dim);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .detail-val {
+      color: var(--text-bright);
+    }
 
     /* Footer */
     .footer {
@@ -219,24 +312,65 @@
       font-size: 11px;
       color: var(--text-dim);
     }
-    .footer-msg { color: var(--accent-dim); }
+
+    .footer-msg {
+      color: var(--accent-dim);
+    }
 
     /* Color classes */
-    .c-good { color: var(--good); }
-    .c-mod { color: var(--mod); }
-    .c-warn { color: var(--warn); }
-    .c-unh { color: var(--unh); }
-    .c-haz { color: var(--haz); }
-    .c-anom { color: var(--anomaly); }
-    .c-dim { color: var(--text-dim); }
-    .c-bright { color: var(--text-bright); }
-    .c-accent { color: var(--accent); }
+    .c-good {
+      color: var(--good);
+    }
+
+    .c-mod {
+      color: var(--mod);
+    }
+
+    .c-warn {
+      color: var(--warn);
+    }
+
+    .c-unh {
+      color: var(--unh);
+    }
+
+    .c-haz {
+      color: var(--haz);
+    }
+
+    .c-anom {
+      color: var(--anomaly);
+    }
+
+    .c-dim {
+      color: var(--text-dim);
+    }
+
+    .c-bright {
+      color: var(--text-bright);
+    }
+
+    .c-accent {
+      color: var(--accent);
+    }
 
     /* Scrollbars */
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: var(--bg-main); }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--bg-main);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--accent-dim);
+    }
 
     /* Report Styles */
     .detail-row {
@@ -245,6 +379,7 @@
       gap: 12px;
       margin-bottom: 20px;
     }
+
     .detail-col {
       flex: 1;
       min-width: 140px;
@@ -254,19 +389,22 @@
       display: flex;
       flex-direction: column;
       gap: 4px;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
     }
+
     .detail-label {
       font-size: 9px;
       color: var(--text-dim);
       text-transform: uppercase;
       letter-spacing: 1px;
     }
+
     .detail-val {
       font-size: 16px;
       color: var(--text-bright);
       font-weight: bold;
     }
+
     .report-section {
       margin-top: 15px;
       border: 1px solid var(--border);
@@ -274,6 +412,7 @@
       display: flex;
       flex-direction: column;
     }
+
     .report-header {
       background: var(--bg-secondary);
       padding: 8px 12px;
@@ -285,14 +424,17 @@
       display: flex;
       justify-content: space-between;
     }
+
     .report-scroll {
       max-height: 450px;
       overflow-y: auto;
     }
+
     .report-table {
       width: 100%;
       border-collapse: collapse;
     }
+
     .report-table th {
       position: sticky;
       top: 0;
@@ -303,12 +445,16 @@
       text-align: left;
       border-bottom: 1px solid var(--border);
     }
+
     .report-table td {
       padding: 8px 12px;
       border-bottom: 1px solid var(--border);
       font-size: 11px;
     }
-    .report-table tr:hover { background: rgba(212, 164, 106, 0.05); }
+
+    .report-table tr:hover {
+      background: rgba(212, 164, 106, 0.05);
+    }
 
     /* Modal */
     .modal-overlay {
@@ -320,7 +466,11 @@
       align-items: center;
       justify-content: center;
     }
-    .modal-overlay.open { display: flex; }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
     .modal {
       background: var(--bg-main);
       border: 1px solid var(--border-active);
@@ -331,13 +481,15 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
     }
+
     .modal-body {
       overflow-y: auto;
       flex: 1;
       padding-top: 15px;
     }
+
     .modal h2 {
       color: var(--accent);
       font-size: 12px;
@@ -348,6 +500,7 @@
       margin-bottom: 14px;
       font-weight: normal;
     }
+
     .modal-row {
       display: flex;
       justify-content: space-between;
@@ -355,7 +508,11 @@
       border-bottom: 1px solid rgba(61, 58, 92, 0.2);
       font-size: 12px;
     }
-    .modal-row span:first-child { color: var(--text-dim); }
+
+    .modal-row span:first-child {
+      color: var(--text-dim);
+    }
+
     .modal-close {
       margin-top: 16px;
       width: 100%;
@@ -370,439 +527,449 @@
       text-transform: uppercase;
       transition: all 0.15s;
     }
-    .modal-close:hover { background: var(--accent-dim); color: var(--bg); border-color: var(--accent-dim); }
+
+    .modal-close:hover {
+      background: var(--accent-dim);
+      color: var(--bg);
+      border-color: var(--accent-dim);
+    }
   </style>
 </head>
+
 <body>
 
-<div class="container">
-  <div class="header-bar">AirVision DB Inspector</div>
+  <div class="container">
+    <div class="header-bar">AirVision DB Inspector</div>
 
-  <div class="toolbar">
-    <span class="prompt">$</span>
-    <input type="text" id="filter" placeholder="filter city, country, pollutant..." autocomplete="off" spellcheck="false">
-    <div class="buttons">
-      <button class="btn active" data-mode="all">All</button>
-      <button class="btn" data-mode="hazard">Hazards</button>
-      <button class="btn" data-mode="anomaly">Anomalies</button>
-      <button class="btn" data-mode="india">India States</button>
-    </div>
-    <div style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
-      <span class="detail-label" style="font-size: 10px;">SORT BY:</span>
-      <select id="extra-sort" class="btn" style="text-transform: none; padding: 4px 8px; border-color: var(--accent-dim); background: var(--bg-input); color: var(--text);">
-        <option value="aqi-desc">AQI (High to Low)</option>
-        <option value="aqi-asc">AQI (Low to High)</option>
-        <option value="name-asc">Name (A-Z)</option>
-        <option value="name-desc">Name (Z-A)</option>
-        <option value="pol-asc">Dom. Pollutant</option>
-      </select>
-    </div>
-  </div>
-
-  <div class="main-area">
-    <div class="table-panel">
-      <div class="panel-title" id="table-title">World AQI Data</div>
-      <div class="table-scroll">
-        <table>
-          <thead id="thead"></thead>
-          <tbody id="tbody"></tbody>
-        </table>
+    <div class="toolbar">
+      <span class="prompt">$</span>
+      <input type="text" id="filter" placeholder="filter city, country, pollutant..." autocomplete="off"
+        spellcheck="false">
+      <div class="buttons">
+        <button class="btn active" data-mode="all">All</button>
+        <button class="btn" data-mode="hazard">Hazards</button>
+        <button class="btn" data-mode="anomaly">Anomalies</button>
+        <button class="btn" data-mode="india">India States</button>
       </div>
-      <div class="detail-bar" id="detail-bar"></div>
-    </div>
-
-    <div class="events-panel">
-      <div class="panel-title">System Events</div>
-      <div class="events-scroll" id="events"></div>
-      <div style="padding: 10px; border-top: 1px solid var(--border);">
-        <button class="btn" style="width: 100%; height: 50px; font-size: 14px; background: var(--bg-input); border-color: var(--accent); color: var(--accent); white-space: normal;" onclick="returnToWebApp()">
-          RETURN TO WEB APP ↵
-        </button>
+      <div style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
+        <span class="detail-label" style="font-size: 10px;">SORT BY:</span>
+        <select id="extra-sort" class="btn"
+          style="text-transform: none; padding: 4px 8px; border-color: var(--accent-dim); background: var(--bg-input); color: var(--text);">
+          <option value="aqi-desc">AQI (High to Low)</option>
+          <option value="aqi-asc">AQI (Low to High)</option>
+          <option value="name-asc">Name (A-Z)</option>
+          <option value="name-desc">Name (Z-A)</option>
+          <option value="pol-asc">Dom. Pollutant</option>
+        </select>
       </div>
     </div>
+
+    <div class="main-area">
+      <div class="table-panel">
+        <div class="panel-title" id="table-title">World AQI Data</div>
+        <div class="table-scroll">
+          <table>
+            <thead id="thead"></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+        <div class="detail-bar" id="detail-bar"></div>
+      </div>
+
+      <div class="events-panel">
+        <div class="panel-title">System Events</div>
+        <div class="events-scroll" id="events"></div>
+        <div style="padding: 10px; border-top: 1px solid var(--border);">
+          <button class="btn"
+            style="width: 100%; height: 50px; font-size: 14px; background: var(--bg-input); border-color: var(--accent); color: var(--accent); white-space: normal;"
+            onclick="returnToWebApp()">
+            RETURN TO WEB APP ↵
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="footer-msg" id="status">> ready</span>
+      <span>R refresh &middot; S sort aqi &middot; ESC clear</span>
+    </div>
   </div>
 
-  <div class="footer">
-    <span class="footer-msg" id="status">> ready</span>
-    <span>R refresh &middot; S sort aqi &middot; ESC clear</span>
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <h2 id="modal-title">Detail</h2>
+      <div id="modal-body"></div>
+      <button class="modal-close" onclick="closeModal()">Close</button>
+    </div>
   </div>
-</div>
 
-<div class="modal-overlay" id="modal-overlay">
-  <div class="modal">
-    <h2 id="modal-title">Detail</h2>
-    <div id="modal-body"></div>
-    <button class="modal-close" onclick="closeModal()">Close</button>
-  </div>
-</div>
+  <script>
+    const API = '/api/aqi';
+    let allRows = [];
+    let filtered = [];
+    let currentMode = 'all';
+    let sortKey = '';
+    let sortAsc = false;
 
-<script>
-const API = '/api/aqi';
-let allRows = [];
-let filtered = [];
-let currentMode = 'all';
-let sortKey = '';
-let sortAsc = false;
+    const $ = id => document.getElementById(id);
+    const tbody = $('tbody');
+    const thead = $('thead');
+    const eventsEl = $('events');
+    const statusEl = $('status');
+    const filterEl = $('filter');
+    const detailBar = $('detail-bar');
+    const tableTitle = $('table-title');
 
-const $ = id => document.getElementById(id);
-const tbody = $('tbody');
-const thead = $('thead');
-const eventsEl = $('events');
-const statusEl = $('status');
-const filterEl = $('filter');
-const detailBar = $('detail-bar');
-const tableTitle = $('table-title');
+    // ── Helpers ──────────────────────────────────────────────────────────
 
-// ── Helpers ──────────────────────────────────────────────────────────
-
-function aqiClass(v) {
-  if (v == null) return 'c-dim';
-  if (v <= 50) return 'c-good';
-  if (v <= 100) return 'c-mod';
-  if (v <= 150) return 'c-warn';
-  if (v <= 200) return 'c-unh';
-  return 'c-haz';
-}
-
-function aqiTag(v) {
-  if (v == null) return '—';
-  if (v <= 50) return 'Good';
-  if (v <= 100) return 'Moderate';
-  if (v <= 150) return 'Sensitive';
-  if (v <= 200) return 'Unhealthy';
-  if (v <= 300) return 'Very Unhealthy';
-  return 'Hazardous';
-}
-
-function statusTag(v, type) {
-  if (type === 'anomaly') return { text: 'SPIKE', cls: 'c-anom' };
-  if (v == null) return { text: 'N/A', cls: 'c-dim' };
-  if (v > 200) return { text: 'CRITICAL', cls: 'c-haz' };
-  if (v > 150) return { text: 'ALERT', cls: 'c-unh' };
-  if (v > 100) return { text: 'WARN', cls: 'c-warn' };
-  if (v > 50) return { text: 'MOD', cls: 'c-mod' };
-  return { text: 'CLEAN', cls: 'c-good' };
-}
-
-function timestamp() {
-  return new Date().toLocaleTimeString('en-GB', { hour12: false });
-}
-
-function log(msg, level) {
-  const icon = level === 'ok' ? '<span class="ico-ok">[✓]</span>'
-    : level === 'warn' ? '<span class="ico-warn">[!]</span>'
-    : '<span class="ico-err">[✗]</span>';
-  const d = document.createElement('div');
-  d.className = 'evt';
-  d.innerHTML = `<span class="evt-time">${timestamp()}</span>${icon}<span class="evt-msg">${msg}</span>`;
-  eventsEl.appendChild(d);
-  eventsEl.scrollTop = eventsEl.scrollHeight;
-}
-
-function setStatus(msg) { statusEl.textContent = '> ' + msg; }
-
-// ── Column definitions per mode ──────────────────────────────────────
-
-const COLUMNS = {
-  all: [
-    { key: 'idx', label: '#' },
-    { key: 'name', label: 'Country' },
-    { key: 'code', label: 'Code' },
-    { key: 'aqi', label: 'AQI' },
-    { key: 'tag', label: 'Level' },
-    { key: 'pol', label: 'Dom. Pol' },
-    { key: 'stations', label: 'Count' },
-    { key: 'status', label: 'Status' },
-  ],
-  hazard: [
-    { key: 'idx', label: '#' },
-    { key: 'name', label: 'Country' },
-    { key: 'code', label: 'Code' },
-    { key: 'aqi', label: 'AQI' },
-    { key: 'tag', label: 'Level' },
-    { key: 'pol', label: 'Dom. Pol' },
-    { key: 'stations', label: 'Count' },
-    { key: 'status', label: 'Status' },
-  ],
-  anomaly: [
-    { key: 'idx', label: '#' },
-    { key: 'name', label: 'Country' },
-    { key: 'code', label: 'Code' },
-    { key: 'aqi', label: 'Current AQI' },
-    { key: 'baseline', label: '30d Avg' },
-    { key: 'pct', label: '% Above' },
-    { key: 'severity', label: 'Severity' },
-    { key: 'pol', label: 'Dom. Pol' },
-  ],
-  india: [
-    { key: 'idx', label: '#' },
-    { key: 'name', label: 'State' },
-    { key: 'city', label: 'Station City' },
-    { key: 'aqi', label: 'AQI' },
-    { key: 'tag', label: 'Level' },
-    { key: 'status', label: 'Status' },
-  ],
-};
-
-function renderHeader(mode) {
-  const cols = COLUMNS[mode] || COLUMNS.all;
-  thead.innerHTML = '<tr>' + cols.map(c =>
-    `<th data-key="${c.key}" class="${sortKey === c.key ? 'sorted' + (sortAsc ? ' asc' : '') : ''}">${c.label}</th>`
-  ).join('') + '</tr>';
-
-  thead.querySelectorAll('th').forEach(th => {
-    th.addEventListener('click', () => {
-      const k = th.dataset.key;
-      if (sortKey === k) sortAsc = !sortAsc;
-      else { sortKey = k; sortAsc = false; }
-      applyFilter();
-    });
-  });
-}
-
-// ── Fetch data ───────────────────────────────────────────────────────
-
-async function fetchMode(mode) {
-  currentMode = mode;
-  allRows = [];
-  filtered = [];
-  tbody.innerHTML = '';
-  detailBar.classList.remove('open');
-  sortKey = '';
-
-  const titles = { all: 'World AQI Data', hazard: 'Hazardous Zones (>200)', anomaly: 'Anomaly Detection', india: 'India State Telemetry' };
-  tableTitle.textContent = titles[mode] || 'Data';
-  renderHeader(mode);
-  setStatus(`connecting to ${mode} endpoint...`);
-  log(`Fetching ${mode} data...`);
-
-  try {
-    if (mode === 'all' || mode === 'hazard') {
-      const res = await fetch(`${API}/world`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const countries = json.countries || {};
-      let items = Object.entries(countries).map(([code, d]) => ({
-        code,
-        name: d.name || code,
-        aqi: d.avgAqi,
-        pol: (d.dominentpol || '—').toUpperCase(),
-        stations: d.stationCount || d.stations || '—',
-        tag: aqiTag(d.avgAqi),
-        _type: 'world',
-        _raw: d,
-      }));
-      if (mode === 'hazard') items = items.filter(i => i.aqi > 200);
-      items.sort((a, b) => (b.aqi || 0) - (a.aqi || 0));
-      allRows = items;
-      log(`Received ${Object.keys(countries).length} countries, showing ${items.length}`, 'ok');
-
-    } else if (mode === 'anomaly') {
-      const res = await fetch(`${API}/anomalies`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const items = (json.anomalies || []).map(d => ({
-        code: d.code,
-        name: d.name,
-        aqi: d.currentAqi,
-        baseline: d.baselineAqi,
-        pct: d.percentAbove != null ? `+${d.percentAbove}%` : '—',
-        severity: d.severity || '—',
-        pol: (d.dominentpol || '—').toUpperCase(),
-        _type: 'anomaly',
-        _raw: d,
-      }));
-      allRows = items;
-      log(`${items.length} anomalies detected`, items.length > 0 ? 'warn' : 'ok');
-
-    } else if (mode === 'india') {
-      const res = await fetch(`${API}/india/states`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      const states = json.states || {};
-      const items = Object.entries(states).map(([name, d]) => ({
-        code: 'IN',
-        name: name,
-        city: d.city || d.rawName || '—',
-        aqi: d.aqi,
-        tag: aqiTag(d.aqi),
-        _type: 'state',
-        _raw: d,
-      }));
-      items.sort((a, b) => (b.aqi || 0) - (a.aqi || 0));
-      allRows = items;
-      log(`${items.length} Indian states loaded (source: ${json.source || 'api'})`, 'ok');
+    function aqiClass(v) {
+      if (v == null) return 'c-dim';
+      if (v <= 50) return 'c-good';
+      if (v <= 100) return 'c-mod';
+      if (v <= 150) return 'c-warn';
+      if (v <= 200) return 'c-unh';
+      return 'c-haz';
     }
 
-    applyFilter();
+    function aqiTag(v) {
+      if (v == null) return '—';
+      if (v <= 50) return 'Good';
+      if (v <= 100) return 'Moderate';
+      if (v <= 150) return 'Sensitive';
+      if (v <= 200) return 'Unhealthy';
+      if (v <= 300) return 'Very Unhealthy';
+      return 'Hazardous';
+    }
 
-  } catch (err) {
-    log(`Error: ${err.message}`, 'err');
-    setStatus(`error — ${err.message}`);
-  }
-}
+    function statusTag(v, type) {
+      if (type === 'anomaly') return { text: 'SPIKE', cls: 'c-anom' };
+      if (v == null) return { text: 'N/A', cls: 'c-dim' };
+      if (v > 200) return { text: 'CRITICAL', cls: 'c-haz' };
+      if (v > 150) return { text: 'ALERT', cls: 'c-unh' };
+      if (v > 100) return { text: 'WARN', cls: 'c-warn' };
+      if (v > 50) return { text: 'MOD', cls: 'c-mod' };
+      return { text: 'CLEAN', cls: 'c-good' };
+    }
 
-// ── Filter + Sort + Render ───────────────────────────────────────────
+    function timestamp() {
+      return new Date().toLocaleTimeString('en-GB', { hour12: false });
+    }
 
-function applyFilter() {
-  const q = filterEl.value.toLowerCase().trim();
-  filtered = allRows.filter(r =>
-    (r.name || '').toLowerCase().includes(q) ||
-    (r.code || '').toLowerCase().includes(q) ||
-    (r.pol || '').toLowerCase().includes(q) ||
-    (r.city || '').toLowerCase().includes(q)
-  );
+    function log(msg, level) {
+      const icon = level === 'ok' ? '<span class="ico-ok">[✓]</span>'
+        : level === 'warn' ? '<span class="ico-warn">[!]</span>'
+          : '<span class="ico-err">[✗]</span>';
+      const d = document.createElement('div');
+      d.className = 'evt';
+      d.innerHTML = `<span class="evt-time">${timestamp()}</span>${icon}<span class="evt-msg">${msg}</span>`;
+      eventsEl.appendChild(d);
+      eventsEl.scrollTop = eventsEl.scrollHeight;
+    }
 
-  if (sortKey) {
-    filtered.sort((a, b) => {
-      let va = a[sortKey], vb = b[sortKey];
-      if (typeof va === 'string') va = va.toLowerCase();
-      if (typeof vb === 'string') vb = vb.toLowerCase();
-      if (va == null) return 1;
-      if (vb == null) return -1;
-      if (va < vb) return sortAsc ? -1 : 1;
-      if (va > vb) return sortAsc ? 1 : -1;
-      return 0;
-    });
-  }
+    function setStatus(msg) { statusEl.textContent = '> ' + msg; }
 
-  renderHeader(currentMode);
-  streamRows();
-}
+    // ── Column definitions per mode ──────────────────────────────────────
 
-function streamRows() {
-  tbody.innerHTML = '';
-  const cols = COLUMNS[currentMode] || COLUMNS.all;
-  let i = 0;
+    const COLUMNS = {
+      all: [
+        { key: 'idx', label: '#' },
+        { key: 'name', label: 'Country' },
+        { key: 'code', label: 'Code' },
+        { key: 'aqi', label: 'AQI' },
+        { key: 'tag', label: 'Level' },
+        { key: 'pol', label: 'Dom. Pol' },
+        { key: 'stations', label: 'Count' },
+        { key: 'status', label: 'Status' },
+      ],
+      hazard: [
+        { key: 'idx', label: '#' },
+        { key: 'name', label: 'Country' },
+        { key: 'code', label: 'Code' },
+        { key: 'aqi', label: 'AQI' },
+        { key: 'tag', label: 'Level' },
+        { key: 'pol', label: 'Dom. Pol' },
+        { key: 'stations', label: 'Count' },
+        { key: 'status', label: 'Status' },
+      ],
+      anomaly: [
+        { key: 'idx', label: '#' },
+        { key: 'name', label: 'Country' },
+        { key: 'code', label: 'Code' },
+        { key: 'aqi', label: 'Current AQI' },
+        { key: 'baseline', label: '30d Avg' },
+        { key: 'pct', label: '% Above' },
+        { key: 'severity', label: 'Severity' },
+        { key: 'pol', label: 'Dom. Pol' },
+      ],
+      india: [
+        { key: 'idx', label: '#' },
+        { key: 'name', label: 'State' },
+        { key: 'city', label: 'Station City' },
+        { key: 'aqi', label: 'AQI' },
+        { key: 'tag', label: 'Level' },
+        { key: 'status', label: 'Status' },
+      ],
+    };
 
-  function batch() {
-    const end = Math.min(i + 15, filtered.length);
-    for (; i < end; i++) {
-      const r = filtered[i];
-      const tr = document.createElement('tr');
-      tr.className = 'clickable';
-      tr.onclick = () => showDetail(r);
+    function renderHeader(mode) {
+      const cols = COLUMNS[mode] || COLUMNS.all;
+      thead.innerHTML = '<tr>' + cols.map(c =>
+        `<th data-key="${c.key}" class="${sortKey === c.key ? 'sorted' + (sortAsc ? ' asc' : '') : ''}">${c.label}</th>`
+      ).join('') + '</tr>';
 
-      const st = statusTag(r.aqi, r._type);
+      thead.querySelectorAll('th').forEach(th => {
+        th.addEventListener('click', () => {
+          const k = th.dataset.key;
+          if (sortKey === k) sortAsc = !sortAsc;
+          else { sortKey = k; sortAsc = false; }
+          applyFilter();
+        });
+      });
+    }
 
-      for (const col of cols) {
-        const td = document.createElement('td');
-        if (col.key === 'idx') {
-          td.textContent = String(i + 1).padStart(3, '0');
-          td.className = 'c-dim';
-        } else if (col.key === 'name') {
-          td.textContent = r.name;
-          td.className = 'c-bright';
-        } else if (col.key === 'aqi') {
-          td.textContent = r.aqi != null ? r.aqi : '—';
-          td.className = aqiClass(r.aqi);
-        } else if (col.key === 'tag') {
-          td.textContent = r.tag || '—';
-          td.className = aqiClass(r.aqi);
-        } else if (col.key === 'status') {
-          td.textContent = st.text;
-          td.className = st.cls;
-        } else if (col.key === 'severity') {
-          td.textContent = (r.severity || '—').toUpperCase();
-          td.className = r.severity === 'extreme' ? 'c-haz' : r.severity === 'severe' ? 'c-unh' : 'c-warn';
-        } else if (col.key === 'pct') {
-          td.textContent = r.pct || '—';
-          td.className = 'c-anom';
-        } else if (col.key === 'baseline') {
-          td.textContent = r.baseline != null ? r.baseline : '—';
-          td.className = 'c-dim';
-        } else {
-          td.textContent = r[col.key] != null ? r[col.key] : '—';
-          td.className = 'c-dim';
+    // ── Fetch data ───────────────────────────────────────────────────────
+
+    async function fetchMode(mode) {
+      currentMode = mode;
+      allRows = [];
+      filtered = [];
+      tbody.innerHTML = '';
+      detailBar.classList.remove('open');
+      sortKey = '';
+
+      const titles = { all: 'World AQI Data', hazard: 'Hazardous Zones (>200)', anomaly: 'Anomaly Detection', india: 'India State Telemetry' };
+      tableTitle.textContent = titles[mode] || 'Data';
+      renderHeader(mode);
+      setStatus(`connecting to ${mode} endpoint...`);
+      log(`Fetching ${mode} data...`);
+
+      try {
+        if (mode === 'all' || mode === 'hazard') {
+          const res = await fetch(`${API}/world`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          const countries = json.countries || {};
+          let items = Object.entries(countries).map(([code, d]) => ({
+            code,
+            name: d.name || code,
+            aqi: d.avgAqi,
+            pol: (d.dominentpol || '—').toUpperCase(),
+            stations: d.stationCount || d.stations || '—',
+            tag: aqiTag(d.avgAqi),
+            _type: 'world',
+            _raw: d,
+          }));
+          if (mode === 'hazard') items = items.filter(i => i.aqi > 200);
+          items.sort((a, b) => (b.aqi || 0) - (a.aqi || 0));
+          allRows = items;
+          log(`Received ${Object.keys(countries).length} countries, showing ${items.length}`, 'ok');
+
+        } else if (mode === 'anomaly') {
+          const res = await fetch(`${API}/anomalies`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          const items = (json.anomalies || []).map(d => ({
+            code: d.code,
+            name: d.name,
+            aqi: d.currentAqi,
+            baseline: d.baselineAqi,
+            pct: d.percentAbove != null ? `+${d.percentAbove}%` : '—',
+            severity: d.severity || '—',
+            pol: (d.dominentpol || '—').toUpperCase(),
+            _type: 'anomaly',
+            _raw: d,
+          }));
+          allRows = items;
+          log(`${items.length} anomalies detected`, items.length > 0 ? 'warn' : 'ok');
+
+        } else if (mode === 'india') {
+          const res = await fetch(`${API}/india/states`);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          const states = json.states || {};
+          const items = Object.entries(states).map(([name, d]) => ({
+            code: 'IN',
+            name: name,
+            city: d.city || d.rawName || '—',
+            aqi: d.aqi,
+            tag: aqiTag(d.aqi),
+            _type: 'state',
+            _raw: d,
+          }));
+          items.sort((a, b) => (b.aqi || 0) - (a.aqi || 0));
+          allRows = items;
+          log(`${items.length} Indian states loaded (source: ${json.source || 'api'})`, 'ok');
         }
-        tr.appendChild(td);
-      }
-      tbody.appendChild(tr);
 
-      // Log first 8 rows
-      if (i < 8) {
-        const lvl = r.aqi > 200 ? 'err' : r.aqi > 100 ? 'warn' : 'ok';
-        log(`scanned: ${r.name} — AQI ${r.aqi ?? '—'}`, lvl);
+        applyFilter();
+
+      } catch (err) {
+        log(`Error: ${err.message}`, 'err');
+        setStatus(`error — ${err.message}`);
       }
     }
 
-    if (i < filtered.length) {
-      requestAnimationFrame(batch);
-    } else {
-      setStatus(`${filtered.length} records loaded`);
-      if (filtered.length > 8) log(`... ${filtered.length - 8} more records`, 'ok');
+    // ── Filter + Sort + Render ───────────────────────────────────────────
+
+    function applyFilter() {
+      const q = filterEl.value.toLowerCase().trim();
+      filtered = allRows.filter(r =>
+        (r.name || '').toLowerCase().includes(q) ||
+        (r.code || '').toLowerCase().includes(q) ||
+        (r.pol || '').toLowerCase().includes(q) ||
+        (r.city || '').toLowerCase().includes(q)
+      );
+
+      if (sortKey) {
+        filtered.sort((a, b) => {
+          let va = a[sortKey], vb = b[sortKey];
+          if (typeof va === 'string') va = va.toLowerCase();
+          if (typeof vb === 'string') vb = vb.toLowerCase();
+          if (va == null) return 1;
+          if (vb == null) return -1;
+          if (va < vb) return sortAsc ? -1 : 1;
+          if (va > vb) return sortAsc ? 1 : -1;
+          return 0;
+        });
+      }
+
+      renderHeader(currentMode);
+      streamRows();
     }
-  }
 
-  batch();
-}
+    function streamRows() {
+      tbody.innerHTML = '';
+      const cols = COLUMNS[currentMode] || COLUMNS.all;
+      let i = 0;
 
-// ── Row detail ───────────────────────────────────────────────────────
+      function batch() {
+        const end = Math.min(i + 15, filtered.length);
+        for (; i < end; i++) {
+          const r = filtered[i];
+          const tr = document.createElement('tr');
+          tr.className = 'clickable';
+          tr.onclick = () => showDetail(r);
 
-function showDetail(r) {
-  // Show inline detail bar
-  const bar = $('detail-bar');
-  bar.classList.add('open');
+          const st = statusTag(r.aqi, r._type);
 
-  let html = '';
+          for (const col of cols) {
+            const td = document.createElement('td');
+            if (col.key === 'idx') {
+              td.textContent = String(i + 1).padStart(3, '0');
+              td.className = 'c-dim';
+            } else if (col.key === 'name') {
+              td.textContent = r.name;
+              td.className = 'c-bright';
+            } else if (col.key === 'aqi') {
+              td.textContent = r.aqi != null ? r.aqi : '—';
+              td.className = aqiClass(r.aqi);
+            } else if (col.key === 'tag') {
+              td.textContent = r.tag || '—';
+              td.className = aqiClass(r.aqi);
+            } else if (col.key === 'status') {
+              td.textContent = st.text;
+              td.className = st.cls;
+            } else if (col.key === 'severity') {
+              td.textContent = (r.severity || '—').toUpperCase();
+              td.className = r.severity === 'extreme' ? 'c-haz' : r.severity === 'severe' ? 'c-unh' : 'c-warn';
+            } else if (col.key === 'pct') {
+              td.textContent = r.pct || '—';
+              td.className = 'c-anom';
+            } else if (col.key === 'baseline') {
+              td.textContent = r.baseline != null ? r.baseline : '—';
+              td.className = 'c-dim';
+            } else {
+              td.textContent = r[col.key] != null ? r[col.key] : '—';
+              td.className = 'c-dim';
+            }
+            tr.appendChild(td);
+          }
+          tbody.appendChild(tr);
 
-  function addCol(label, value, cls) {
-    html += `<div class="detail-col"><span class="detail-label">${label}</span><span class="detail-val ${cls || ''}">${value}</span></div>`;
-  }
+          // Log first 8 rows
+          if (i < 8) {
+            const lvl = r.aqi > 200 ? 'err' : r.aqi > 100 ? 'warn' : 'ok';
+            log(`scanned: ${r.name} — AQI ${r.aqi ?? '—'}`, lvl);
+          }
+        }
 
-  addCol('Name', r.name, 'c-bright');
-  addCol('Code', r.code);
-  addCol('AQI', r.aqi ?? '—', aqiClass(r.aqi));
-  addCol('Level', aqiTag(r.aqi), aqiClass(r.aqi));
+        if (i < filtered.length) {
+          requestAnimationFrame(batch);
+        } else {
+          setStatus(`${filtered.length} records loaded`);
+          if (filtered.length > 8) log(`... ${filtered.length - 8} more records`, 'ok');
+        }
+      }
 
-  if (r._type === 'world') {
-    addCol('Dom. Pollutant', r.pol);
-    addCol('Stations', r.stations);
-    if (r._raw?.city) addCol('City', r._raw.city);
-  } else if (r._type === 'anomaly') {
-    addCol('30d Baseline', r.baseline);
-    addCol('% Above', r.pct, 'c-anom');
-    addCol('Severity', (r.severity || '').toUpperCase(), r.severity === 'extreme' ? 'c-haz' : 'c-warn');
-    addCol('Ratio', r._raw?.ratio ? r._raw.ratio + 'x' : '—');
-  } else if (r._type === 'state') {
-    addCol('Station City', r.city);
-    addCol('Region', 'India');
-  }
+      batch();
+    }
 
-  bar.innerHTML = html;
+    // ── Row detail ───────────────────────────────────────────────────────
 
-  // Also try to fetch full country detail for world rows
-  if (r._type === 'world' && r.code) {
-    fetchCountryDetail(r.code);
-  }
-}
-
-async function fetchCountryDetail(code) {
-    try {
+    function showDetail(r) {
+      // Show inline detail bar
       const bar = $('detail-bar');
-      bar.innerHTML = '<div class="detail-row">LOADING COMPREHENSIVE INTELLIGENCE REPORT...</div>';
-      
-      const res = await fetch(`${API}/country/${code}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const d = await res.json();
-      log(`Full Report generated: ${d.countryName || code}`, 'ok');
+      bar.classList.add('open');
 
-      let html = '<div class="detail-row">';
-      function addStat(label, value, cls) {
+      let html = '';
+
+      function addCol(label, value, cls) {
         html += `<div class="detail-col"><span class="detail-label">${label}</span><span class="detail-val ${cls || ''}">${value}</span></div>`;
       }
 
-      addStat('Current Average', d.avgAqi || '—', aqiClass(d.avgAqi));
-      if (d.baseline30 != null) addStat('30-Day Mean', d.baseline30);
-      if (d.trend) addStat('Trend Vector', `${d.trend.trend.arrow} ${d.trend.trend.label}`);
-      if (d.stationCount) addStat('Active Nodes', d.stationCount);
-      if (d.city) addStat('Prime Impact', d.city);
-      if (d.dominentpol) addStat('Dominant Spec', d.dominentpol.toUpperCase());
-      html += '</div>';
+      addCol('Name', r.name, 'c-bright');
+      addCol('Code', r.code);
+      addCol('AQI', r.aqi ?? '—', aqiClass(r.aqi));
+      addCol('Level', aqiTag(r.aqi), aqiClass(r.aqi));
 
-      // Station Intelligence List
-      if (d.stations && d.stations.length > 0) {
-        html += `
+      if (r._type === 'world') {
+        addCol('Dom. Pollutant', r.pol);
+        addCol('Stations', r.stations);
+        if (r._raw?.city) addCol('City', r._raw.city);
+      } else if (r._type === 'anomaly') {
+        addCol('30d Baseline', r.baseline);
+        addCol('% Above', r.pct, 'c-anom');
+        addCol('Severity', (r.severity || '').toUpperCase(), r.severity === 'extreme' ? 'c-haz' : 'c-warn');
+        addCol('Ratio', r._raw?.ratio ? r._raw.ratio + 'x' : '—');
+      } else if (r._type === 'state') {
+        addCol('Station City', r.city);
+        addCol('Region', 'India');
+      }
+
+      bar.innerHTML = html;
+
+      // Also try to fetch full country detail for world rows
+      if (r._type === 'world' && r.code) {
+        fetchCountryDetail(r.code);
+      }
+    }
+
+    async function fetchCountryDetail(code) {
+      try {
+        const bar = $('detail-bar');
+        bar.innerHTML = '<div class="detail-row">LOADING COMPREHENSIVE INTELLIGENCE REPORT...</div>';
+
+        const res = await fetch(`${API}/country/${code}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const d = await res.json();
+        log(`Full Report generated: ${d.countryName || code}`, 'ok');
+
+        let html = '<div class="detail-row">';
+        function addStat(label, value, cls) {
+          html += `<div class="detail-col"><span class="detail-label">${label}</span><span class="detail-val ${cls || ''}">${value}</span></div>`;
+        }
+
+        addStat('Current Average', d.avgAqi || '—', aqiClass(d.avgAqi));
+        if (d.baseline30 != null) addStat('30-Day Mean', d.baseline30);
+        if (d.trend) addStat('Trend Vector', `${d.trend.trend.arrow} ${d.trend.trend.label}`);
+        if (d.stationCount) addStat('Active Nodes', d.stationCount);
+        if (d.city) addStat('Prime Impact', d.city);
+        if (d.dominentpol) addStat('Dominant Spec', d.dominentpol.toUpperCase());
+        html += '</div>';
+
+        // Station Intelligence List
+        if (d.stations && d.stations.length > 0) {
+          html += `
           <div class="report-section">
             <div class="report-header">
               <span>Station Intelligence List</span>
@@ -821,7 +988,7 @@ async function fetchCountryDetail(code) {
                 <tbody>
                   ${d.stations.map((s, idx) => `
                     <tr>
-                      <td class="c-dim">${String(idx+1).padStart(3, '0')}</td>
+                      <td class="c-dim">${String(idx + 1).padStart(3, '0')}</td>
                       <td class="c-bright">${s.stationName || s.station || '—'}</td>
                       <td class="${aqiClass(s.aqi)}" style="font-weight:bold">${s.aqi || 0}</td>
                       <td class="${statusTag(s.aqi, 'world').cls}">${statusTag(s.aqi, 'world').text}</td>
@@ -832,69 +999,70 @@ async function fetchCountryDetail(code) {
             </div>
           </div>
         `;
+        }
+
+        bar.innerHTML = html;
+      } catch (e) {
+        log(`Report fetch failure: ${e.message}`, 'err');
+        $('detail-bar').innerHTML = `<div class="detail-row c-haz">ERROR: FAILED TO GENERATE REPORT FOR ${code.toUpperCase()}</div>`;
       }
-
-      bar.innerHTML = html;
-    } catch (e) {
-      log(`Report fetch failure: ${e.message}`, 'err');
-      $('detail-bar').innerHTML = `<div class="detail-row c-haz">ERROR: FAILED TO GENERATE REPORT FOR ${code.toUpperCase()}</div>`;
     }
-  }
 
 
-function closeModal() {
-  $('modal-overlay').classList.remove('open');
-}
+    function closeModal() {
+      $('modal-overlay').classList.remove('open');
+    }
 
-// ── Button handlers ──────────────────────────────────────────────────
+    // ── Button handlers ──────────────────────────────────────────────────
 
-document.querySelectorAll('.btn[data-mode]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.btn[data-mode]').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    filterEl.value = '';
-    fetchMode(btn.dataset.mode);
-  });
-});
+    document.querySelectorAll('.btn[data-mode]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.btn[data-mode]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        filterEl.value = '';
+        fetchMode(btn.dataset.mode);
+      });
+    });
 
-filterEl.addEventListener('input', applyFilter);
+    filterEl.addEventListener('input', applyFilter);
 
-$('extra-sort').addEventListener('change', (e) => {
-  const [key, dir] = e.target.value.split('-');
-  sortKey = key;
-  sortAsc = (dir === 'asc');
-  applyFilter();
-  log(`Sorted by ${key} (${dir === 'asc' ? 'Asc' : 'Desc'})`, 'ok');
-});
+    $('extra-sort').addEventListener('change', (e) => {
+      const [key, dir] = e.target.value.split('-');
+      sortKey = key;
+      sortAsc = (dir === 'asc');
+      applyFilter();
+      log(`Sorted by ${key} (${dir === 'asc' ? 'Asc' : 'Desc'})`, 'ok');
+    });
 
-// Keyboard — only when filter not focused
-document.addEventListener('keydown', e => {
-  if (document.activeElement === filterEl) return;
-  if (e.key.toLowerCase() === 'r') {
-    fetchMode(currentMode);
-  } else if (e.key.toLowerCase() === 's') {
-    sortKey = 'aqi';
-    sortAsc = !sortAsc;
-    applyFilter();
-    log(`Sorted by AQI ${sortAsc ? 'ascending' : 'descending'}`, 'ok');
-  } else if (e.key === 'Escape') {
-    filterEl.value = '';
-    sortKey = '';
-    detailBar.classList.remove('open');
-    applyFilter();
-    log('Filters cleared', 'ok');
-  }
-});
+    // Keyboard — only when filter not focused
+    document.addEventListener('keydown', e => {
+      if (document.activeElement === filterEl) return;
+      if (e.key.toLowerCase() === 'r') {
+        fetchMode(currentMode);
+      } else if (e.key.toLowerCase() === 's') {
+        sortKey = 'aqi';
+        sortAsc = !sortAsc;
+        applyFilter();
+        log(`Sorted by AQI ${sortAsc ? 'ascending' : 'descending'}`, 'ok');
+      } else if (e.key === 'Escape') {
+        filterEl.value = '';
+        sortKey = '';
+        detailBar.classList.remove('open');
+        applyFilter();
+        log('Filters cleared', 'ok');
+      }
+    });
 
-function returnToWebApp() {
-  const isLocal = window.location.hostname === 'localhost';
-  window.location.href = isLocal ? 'http://localhost:4200' : '/';
-}
+    function returnToWebApp() {
+      const isLocal = window.location.hostname === 'localhost';
+      window.location.href = isLocal ? 'http://localhost:4200' : 'https://airvision-seven.vercel.app';
+    }
 
-// ── Init ─────────────────────────────────────────────────────────────
+    // ── Init ─────────────────────────────────────────────────────────────
 
-log('Terminal ready', 'ok');
-fetchMode('all');
-</script>
+    log('Terminal ready', 'ok');
+    fetchMode('all');
+  </script>
 </body>
+
 </html>

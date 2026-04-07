@@ -103,7 +103,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     // In dev, apiUrl is '/api' (relative) — terminal is on the Express server at port 5000
     // In prod, apiUrl is '/api' on Render — terminal is at same origin under /terminal
     const apiBase = environment.production
-      ? window.location.origin + '/terminal'
+      ? 'https://airvision-xcg9.onrender.com/terminal'
       : 'http://localhost:5000/terminal';
     window.location.href = apiBase;
   }
