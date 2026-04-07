@@ -43,10 +43,12 @@ router.get('/country/:code', async (req, res) => {
       base = { source: 'live', code, countryName: entry.name, ...live };
     }
 
-    const trend      = await getTrend(code);
-    const baseline30 = await get30DayAverage(code);
+    const stations = (snapshot?.stations || []).filter(s => s.countryCode === code);
+    // Sort by AQI to highlight hotspots in the report
+    stations.sort((a, b) => b.aqi - a.aqi);
+
     res.set('Cache-Control', 'public, max-age=300');
-    res.json({ ...base, trend, baseline30 });
+    res.json({ ...base, trend, baseline30, stations });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

@@ -13,6 +13,7 @@ import { HistorySliderComponent } from './components/history-slider/history-slid
 import { aqiInfo } from './utils/aqi';
 import { ShareData } from './models/share-data.model';
 import { safeOutdoorTime } from './utils/health';
+import { environment } from '../environments/environment';
 
 const REFRESH = 120000; // 2 mins
 
@@ -28,9 +29,9 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('tickerInner', { static: false }) tickerRef!: ElementRef<HTMLDivElement>;
 
   aqiData: Record<string, any> = {};
-  selectedCode: string | null = null;
+  selectedCode: string | null = 'IN';
   selectedState: { name: string; aqi: number | null; col: string; cat: string; safe: string; station?: string } | null = null;
-  focusCountry: string | null = null;
+  focusCountry: string | null = 'IN';
   lastUpdated: Date | null = null;
   loading = true;
   error: string | null = null;
@@ -39,6 +40,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
   snapshots: any[] = [];
   isHistorical = false;
   indiaStateMode = false;
+  stations: any[] = [];
 
   readonly legend = [
     { col: '#1e3050', label: 'No Data'             },
@@ -79,6 +81,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
       next: (json: any) => {
         if (json.error) { this.error = json.error; this.loading = false; return; }
         this.aqiData = json.countries || {};
+        this.stations = json.stations || [];
         this.lastUpdated = new Date(json.fetchedAt);
         this.loading = false; this.error = null;
         setTimeout(() => this.updateTicker(), 100);
@@ -95,6 +98,15 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     return v.length ? (v.reduce((a, b) => a + b, 0) / v.length).toFixed(1) : '—';
   }
   get globalInfo() { return aqiInfo(parseFloat(this.globalAvg)); }
+
+  openTerminal(): void {
+    // In dev, apiUrl is '/api' (relative) — terminal is on the Express server at port 5000
+    // In prod, apiUrl is '/api' on Render — terminal is at same origin under /terminal
+    const apiBase = environment.production
+      ? window.location.origin + '/terminal'
+      : 'http://localhost:5000/terminal';
+    window.location.href = apiBase;
+  }
 
   onIndiaStatesClick(): void {
     this.indiaStateMode = !this.indiaStateMode;
@@ -233,6 +245,7 @@ export class AppComponent implements OnInit, OnDestroy, AfterViewInit {
     this.aqi.getSnapshot(ts).subscribe({
       next: (snap: any) => {
         this.aqiData = snap.countries || {};
+        this.stations = snap.stations || [];
         this.lastUpdated = new Date(snap.fetchedAt);
         this.loading = false;
         setTimeout(() => this.updateTicker(), 100);

@@ -16,6 +16,7 @@
     [viewMode]="viewMode"
     [showFps]="true"
     [showIndiaStates]="indiaStateMode"
+    [stations]="stations"
     (countryClick)="onCountryClick($event)"
     (stateClick)="onStateClick($event)"
     (indiaModeChange)="indiaStateMode = $event">
@@ -53,6 +54,9 @@
         [class.active]="indiaStateMode">
   {{ indiaStateMode ? 'Exit State View' : 'India States' }}
 </button>
+<div class="db-terminal-wrap" style="margin-top: 12px;">
+  <button class="db-terminal-btn" (click)="openTerminal()">DB Terminal</button>
+</div>
 </div>
 
 <div class="social-links"></div>

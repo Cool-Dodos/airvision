@@ -9,14 +9,19 @@ let anomalyCachedAt = null;
 function getCachedAnomalies() { return { anomalies: cachedAnomalies, cachedAt: anomalyCachedAt }; }
 
 async function runFetch() {
-  console.log(`[${new Date().toISOString()}] AQI fetch started...`);
+  console.log(`[${new Date().toISOString()}] Global AQI aggregation fetch started...`);
   try {
-    // Fetch global and India state data in parallel
-    const [countryData, indiaStates] = await Promise.all([
-      fetchAllCountries(),
+    const { fetchGlobalAggregation, fetchIndiaStates } = require('./waqi');
+    
+    // 1. Fetch data
+    const [globalResults, indiaStates] = await Promise.all([
+      fetchGlobalAggregation(),
       fetchIndiaStates()
     ]);
 
+    const { countryData, stations } = globalResults;
+
+    // 2. Update India State Snapshots
     if (Object.keys(indiaStates).length > 0) {
       await StateSnapshot.create({
         countryCode: 'IN',
@@ -28,22 +33,33 @@ async function runFetch() {
     const lastSnapshot = await AqiSnapshot.findOne().sort({ fetchedAt: -1 });
     const countryAverages = new Map();
 
-    // 1. Start with last known data to ensure persistence
+    // 3. Persistence: Keep last known data for countries not found in current fetch
     if (lastSnapshot && lastSnapshot.countryAverages) {
       for (const [code, data] of lastSnapshot.countryAverages.entries()) {
         countryAverages.set(code, data);
       }
     }
 
-    // 2. Overwrite with fresh data
+    // 4. Overwrite/Update with fresh global aggregates
     for (const [code, d] of Object.entries(countryData)) {
       countryAverages.set(code, {
-        name: d.countryName, avgAqi: d.aqi, maxAqi: d.aqi, minAqi: d.aqi,
-        stationCount: 1, dominentpol: d.dominentpol, iaqi: d.iaqi, city: d.city, time: d.time,
+        name: d.countryName, 
+        avgAqi: d.aqi, 
+        maxAqi: d.maxAqi, 
+        minAqi: d.minAqi,
+        stationCount: d.stationCount, 
+        dominentpol: d.dominentpol, 
+        city: d.city, 
+        time: d.time,
       });
     }
 
-    await AqiSnapshot.create({ countryAverages, fetchedAt: new Date() });
+    // 5. Create final snapshot with station points for the Globe
+    await AqiSnapshot.create({ 
+      countryAverages, 
+      stations,
+      fetchedAt: new Date() 
+    });
 
     const plainData = {};
     for (const [code, val] of countryAverages.entries()) plainData[code] = val;

@@ -334,17 +334,131 @@ async function fetchSingleCountry(code) { return fetchCountryData(code); }
 
 async function fetchMapBounds(lat1=-60, lng1=-180, lat2=75, lng2=180) {
   try {
-    const { data } = await axios.get(
-      `${BASE}/map/bounds/?latlng=${lat1},${lng1},${lat2},${lng2}&token=${TOKEN()}`,
-      { timeout: 15000 }
-    );
+    const url = `${BASE}/map/bounds/?latlng=${lat1},${lng1},${lat2},${lng2}&token=${TOKEN()}`;
+    const { data } = await axios.get(url, { timeout: 15000 });
     if (data.status !== 'ok') return [];
     return data.data.map(s => ({
       lat: s.lat, lon: s.lon,
       aqi: typeof s.aqi === 'number' ? s.aqi : parseInt(s.aqi) || 0,
-      station: s.station?.name || ''
+      station: s.station?.name || '',
+      uid: s.uid || null
     }));
-  } catch (e) { console.error('fetchMapBounds error:', e.message); return []; }
+  } catch (e) { 
+    console.error('fetchMapBounds error:', e.message); 
+    return []; 
+  }
+}
+
+/**
+ * Fast mapping logic to group stations by country.
+ * Uses suffix name matching and fallback to spatial proximity.
+ */
+function getCountryCodeForStation(s) {
+  if (!s.station) return null;
+  const name = s.station.toLowerCase();
+  
+  // 1. High-density country shortcuts
+  if (name.includes(', usa') || name.includes(', united states')) return 'US';
+  if (name.includes(', india')) return 'IN';
+  if (name.includes(', china')) return 'CN';
+  if (name.includes(', france')) return 'FR';
+  if (name.includes(', uk') || name.includes(', united kingdom')) return 'GB';
+  if (name.includes(', germany')) return 'DE';
+  if (name.includes(', japan')) return 'JP';
+  if (name.includes(', brazil')) return 'BR';
+
+  // 2. Bounding Box Logic for Major Territories (Rough Bounds)
+  const lat = s.lat; const lon = s.lon;
+  if (lat > 24 && lat < 49 && lon > -125 && lon < -67) return 'US';
+  if (lat > 8 && lat < 37 && lon > 68 && lon < 97) return 'IN';
+  if (lat > 18 && lat < 53 && lon > 73 && lon < 135) return 'CN';
+  if (lat > 41 && lat < 82 && lon > 19 && lon < 180) return 'RU';
+  if (lat > -34 && lat < 5 && lon > -74 && lon < -34) return 'BR';
+  if (lat > -44 && lat < -10 && lon > 112 && lon < 154) return 'AU';
+  if (lat > 41 && lat < 83 && lon > -141 && lon < -52) return 'CA';
+  if (lat > 20 && lat < 45 && lon > 122 && lon < 154) return 'JP';
+  if (lat > 35 && lat < 44 && lon > -10 && lon < 4) return 'ES';
+  if (lat > 36 && lat < 47 && lon > 6 && lon < 19) return 'IT';
+  if (lat > 47 && lat < 55 && lon > 5 && lon < 15) return 'DE';
+  if (lat > 42 && lat < 51 && lon > -5 && lon < 10) return 'FR';
+  if (lat > 49 && lat < 60 && lon > -11 && lon < 2) return 'GB';
+
+  // 3. Loop through known countries (Suffix match)
+  for (const [code, info] of Object.entries(COUNTRY_CITIES)) {
+    const cName = info.name.toLowerCase();
+    if (name.includes(`, ${cName}`) || name.includes(`(${cName})`) || name.includes(` - ${cName}`)) return code;
+  }
+
+  // 4. Proximity Fallback (Closest neighbor within 10 deg)
+  let bestCode = null;
+  let minBox = 100; // 10 degrees squared
+  for (const [code, info] of Object.entries(COUNTRY_CITIES)) {
+    if (!info.geo) continue;
+    const distSq = Math.pow(s.lat - info.geo[0], 2) + Math.pow(s.lon - info.geo[1], 2);
+    if (distSq < minBox) {
+      minBox = distSq;
+      bestCode = code;
+    }
+  }
+
+  return bestCode;
+}
+
+
+async function fetchGlobalAggregation() {
+  console.log('[WAQI] Global aggregation started...');
+  const quadrants = [
+    [-60, -180, 0, 0],   // SW quadrant
+    [0, -180, 75, 0],    // NW quadrant
+    [-60, 0, 0, 180],    // SE quadrant
+    [0, 0, 75, 180],     // NE quadrant
+  ];
+
+  const allStations = [];
+  for (const q of quadrants) {
+    const stats = await fetchMapBounds(q[0], q[1], q[2], q[3]);
+    allStations.push(...stats);
+  }
+
+  console.log(`[WAQI] Fetched ${allStations.length} raw stations. Aggregrating...`);
+  const countryStats = {};
+  const heatmapStations = [];
+
+  for (const s of allStations) {
+    if (!s.aqi || s.aqi <= 0) continue;
+    const code = getCountryCodeForStation(s);
+    if (!code) continue;
+
+    if (!countryStats[code]) {
+      countryStats[code] = {
+        name: COUNTRY_CITIES[code].name,
+        aqiSum: 0, count: 0, max: -Infinity, min: Infinity,
+        city: '', time: new Date().toISOString()
+      };
+    }
+
+    const cs = countryStats[code];
+    cs.aqiSum += s.aqi;
+    cs.count++;
+    if (s.aqi > cs.max) { cs.max = s.aqi; cs.city = s.station; }
+    if (s.aqi < cs.min) cs.min = s.aqi;
+
+    // Save for heat-fusion (sampling to keep payload manageable)
+    if (s.aqi > 40 || Math.random() > 0.8) {
+      heatmapStations.push({ ...s, countryCode: code });
+    }
+  }
+
+  const results = {};
+  for (const [code, s] of Object.entries(countryStats)) {
+    results[code] = {
+      countryName: s.name, aqi: Math.round(s.aqiSum / s.count),
+      maxAqi: s.max, minAqi: s.min, stationCount: s.count,
+      city: s.city, time: s.time, dominentpol: 'avg_agg'
+    };
+  }
+
+  return { countryData: results, stations: heatmapStations.slice(0, 2000) };
 }
 
 // ─── India state config ────────────────────────────────────────────────────
@@ -424,5 +538,6 @@ async function fetchIndiaStates() {
 
 module.exports = {
   fetchAllCountries, fetchSingleCountry, fetchCityAQI, fetchGeoAQI,
-  fetchMapBounds, fetchIndiaStates, normalizeStateName, COUNTRY_CITIES
+  fetchMapBounds, fetchIndiaStates, normalizeStateName, COUNTRY_CITIES,
+  fetchGlobalAggregation
 };

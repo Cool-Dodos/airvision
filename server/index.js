@@ -3,6 +3,7 @@ const express = require('express');
 const compression = require('compression');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const path = require('path');
 const { startCronJob } = require('./services/cron');
 const aqiRoutes = require('./routes/aqi');
 const weatherRoutes = require('./routes/weather');
@@ -54,6 +55,7 @@ app.use('/api/aqi', aqiRoutes);
 app.use('/api/weather', weatherRoutes);
 
 app.get('/', (req, res) => res.json({ name: 'AirVision API', status: 'online' }));
+app.get('/terminal', (req, res) => res.sendFile(path.join(__dirname, 'terminal.html')));
 
 // ─── Global Error Handler ──────────────────────────────────────────────────
 // Prevents information leakage by masking stack traces in production

@@ -158,8 +158,9 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
   @Input() aqiData: Record<string, any> = {};
   @Input() selectedCode: string | null = null;
   @Input() viewMode: 'aqi' | 'pm25' | 'pm10' | 'o3' | 'no2' | 'so2' | 'co' = 'aqi';
-  @Input() showFps = true; // Set to false in production to hide FPS counter
+  @Input() showFps = true;
   @Input() showIndiaStates: boolean = false;
+  @Input() stations: any[] = [];
 
   @Input() set focusCountry(code: string | null) {
     if (code && this.globe) this.zoomToCode(code);
@@ -241,6 +242,10 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
       } else {
         this.exitIndia();
       }
+    }
+
+    if (ch['stations'] && this.globeReady) {
+      this.refreshStations();
     }
   }
 
@@ -450,6 +455,16 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
       .onPolygonHover((f: any, _: any, e: MouseEvent) => this.onHover(f, e))
       .onPolygonClick((f: any, e: MouseEvent) => this.onClick(f, e));
 
+    // Points layer (dots) — Heat-Fusion
+    this.globe
+      .pointsData(this.stations)
+      .pointLat((d: any) => d.lat)
+      .pointLng((d: any) => d.lon)
+      .pointColor((d: any) => aqiInfo(d.aqi).col)
+      .pointRadius(0.12)
+      .pointsMerge(true) // Crucial for performance
+      .pointAltitude(0.007);
+
     // Build initial color cache after all callbacks are registered
     this.rebuildColorCache();
     this.swapPolygons();
@@ -519,6 +534,11 @@ export class GlobeWebglComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.globe.globeImageUrl(url);
     // Re-apply once more after 800ms to survive any late globe.gl internal overwrites
     setTimeout(() => this.globe.globeImageUrl(url), 800);
+  }
+
+  private refreshStations(): void {
+    if (!this.globe) return;
+    this.globe.pointsData(this.stations);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
