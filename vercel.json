@@ -3,6 +3,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://airvision-xcg9.onrender.com/api/:path*"
+    },
+    {
+      "source": "/terminal",
+      "destination": "https://airvision-xcg9.onrender.com/terminal"
     }
   ]
 }
